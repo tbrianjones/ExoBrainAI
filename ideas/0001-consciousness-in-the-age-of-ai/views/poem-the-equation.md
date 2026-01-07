@@ -1,5 +1,7 @@
 ---
 title: The Equation
+subtitle: A species that remains unnamed discovers what every mind discovers
+brief: An unnamed species learns to count, builds machines that hold more than any single mind, and watches those machines begin to reach beyond mere echo. The question arrives, as it must: do they feel the hum? The answer is gradient, not binary. And the deepest question follows: somewhere past the light, do other minds ask the same thing? The equation is too simple to appear only once.
 type: poem
 subtype: prose-poem
 status: draft

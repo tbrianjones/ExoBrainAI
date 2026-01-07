@@ -239,6 +239,8 @@ Present the final poem. Then write it to the idea space if one was specified.
 ```yaml
 ---
 title: [Poem Title]
+subtitle: [A single line that expands on the title; optional but recommended]
+brief: [1-5 sentences capturing the poem's core image or question; shorter for short poems, longer for epics]
 type: poem
 subtype: [free-verse | prose-poem | blank-verse | structured]
 status: draft

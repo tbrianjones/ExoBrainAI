@@ -81,6 +81,8 @@ The file begins with YAML frontmatter:
 ```yaml
 ---
 title: [Title of the piece]
+subtitle: [A single line that expands on the title; optional but recommended]
+brief: [1-5 sentences capturing the core thesis or purpose; shorter for short content, longer for long content]
 type: [blog-post | technical-overview | video-script | essay | ...]
 status: [outline | draft | review | final]
 audience: [who this is for]

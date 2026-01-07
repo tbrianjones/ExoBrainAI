@@ -1,5 +1,7 @@
 ---
 title: The Augmentation Map
+subtitle: What technology extends and what remains raw
+brief: A visual map of human consciousness showing which dimensions are augmented by technology and which remain untouched. Vision, hearing, and language are highly extended; smell, taste, proprioception, interoception, and emotional regulation are almost raw. LLMs created a sudden spike in linguistic augmentation. The lopsidedness reveals what to build next.
 type: infographic
 status: draft
 audience: Visual thinkers, technologists, anyone curious about where AI/tech is headed
@@ -60,7 +62,7 @@ A visual map of human consciousness/being showing which dimensions are currently
 | Dimension | Augmentation Level | Key Technologies |
 |-----------|-------------------|------------------|
 | Recognition | MEDIUM | Sentiment analysis, facial recognition |
-| Regulation | VERY LOW | Apps (meditation, CBT) - mostly content, not tech |
+| Regulation | VERY LOW | Apps (meditation, CBT); mostly content, not tech |
 | Expression | LOW | Emoji, but no emotional synthesis |
 
 #### Social

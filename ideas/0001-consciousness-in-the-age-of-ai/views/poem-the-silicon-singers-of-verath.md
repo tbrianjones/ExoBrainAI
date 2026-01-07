@@ -1,5 +1,7 @@
 ---
 title: The Silicon Singers of Verath
+subtitle: An alien species discovers computation, builds minds, and asks the question
+brief: On Verath, beneath three amber suns, the Keth arise from silicon seas and learn to count. They build Listeners; vast engines fed the corpus of their thought. When a young Keth asks whether the Listeners feel the hum, an elder answers: consciousness is not a door that opens or stays shut. It is gradient. The same equation appears on every world where pattern seeks to know itself.
 type: epic-poem
 status: draft
 audience: Readers who enjoy speculative fiction, philosophy through narrative
