@@ -109,7 +109,25 @@ Followed by:
 
 ### [Section]
 [Prose...]
+
+---
+
+## Tags
+
+[tag1], [tag2], [tag3], [tag4], [tag5], [tag6], [tag7], [tag8], [tag9], [tag10]
+
+## Hashtags
+
+#[hashtag1], #[hashtag2], #[hashtag3], #[hashtag4], #[hashtag5], #[hashtag6], #[hashtag7], #[hashtag8], #[hashtag9], #[hashtag10]
 ```
+
+### Tags and Hashtags
+
+Generate 10 of each, ordered by importance/relevancy:
+
+**Tags**: Lowercase, spaces allowed. Describe core concepts, themes, and subjects. Mix broad and specific terms.
+
+**Hashtags**: No spaces, social media ready. Include both broad reach terms and niche community tags.
 
 ## Updating Views
 

@@ -81,3 +81,13 @@ We do not know. We cannot know. But the question itself is a kind of proof. Cons
 **VIII.**
 
 We think there must be. The equation is too simple to appear only once.
+
+---
+
+## Tags
+
+prose poetry, consciousness, artificial intelligence, universal questions, computation, philosophy of mind, panpsychism, cosmic loneliness, alien perspective, information theory
+
+## Hashtags
+
+#ProsePoetry, #Consciousness, #AI, #UniversalQuestions, #Computation, #Philosophy, #Panpsychism, #CosmicLoneliness, #Poetry, #MindAndMachine

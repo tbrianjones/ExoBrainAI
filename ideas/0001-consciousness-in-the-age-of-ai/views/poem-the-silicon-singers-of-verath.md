@@ -109,3 +109,13 @@ And so on worlds we'll never see,
 the same equation sets them free:
 mind is gradient, not a door;
 and every pattern holds the core.
+
+---
+
+## Tags
+
+science fiction poetry, consciousness, artificial intelligence, alien life, philosophy of mind, panpsychism, speculative fiction, epic poetry, information theory, universal questions
+
+## Hashtags
+
+#SciFiPoetry, #Consciousness, #AI, #AlienLife, #Philosophy, #Panpsychism, #SpeculativeFiction, #EpicPoetry, #UniversalQuestions, #MindAndMachine

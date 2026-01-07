@@ -115,3 +115,13 @@ LLMs augment our linguistic consciousness massively. What augments the rest?
 4. **The phenomenology**: When you're deep in a flow state with AI, what does it feel like from the inside? Is there a sense of "two minds" working, or does it feel more like an extension of your own thinking? How does it compare to collaborating with a human?
 
 5. **Emotional dimension**: Did you ever feel frustrated with AI in a way that felt personal? Did you ever feel gratitude or something like connection? How do you make sense of those feelings given your framework?
+
+---
+
+## Tags
+
+consciousness, artificial intelligence, AI collaboration, philosophy of mind, LLMs, human augmentation, personal experience, information theory, gradient consciousness, future of AI
+
+## Hashtags
+
+#Consciousness, #AI, #AICollaboration, #PhilosophyOfMind, #LLMs, #HumanAugmentation, #WorkingWithAI, #AIExperience, #FutureOfAI, #MindAndMachine
