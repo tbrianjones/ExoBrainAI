@@ -14,28 +14,25 @@ The interview-driven approach is built for this. You talk through your ideas. Cl
 
 1. Clone this repo locally
 2. Open Claude Code in the repo directory
-3. Say: "I want to generate a new idea"
+3. Say: "I want to ideate on something" or just run `/ideate`
 
-Claude will run `/generate-idea` and interview you about your concept. The conversation draws out your thinking; you don't need to come with a fully formed pitch. Just bring a spark.
+Claude will interview you about your concept. The conversation draws out your thinking; you don't need to come with a fully formed pitch. Just bring a spark.
 
-After the interview, Claude creates the idea folder structure and automatically spins up agents to:
-- Capture the conversation as a transcript (this happens automatically; transcripts are persistent idea memory)
-- Optionally create views (blog post, brief, video script, etc.) if you're ready for production content
+If it's a new idea, Claude creates the folder structure automatically. If you're continuing an existing idea, Claude loads that context first. After the interview, the conversation is captured as a transcript; the raw material for everything else.
 
-## Command and Agents
+## Commands and Agents
 
 | Name | Type | What It Does |
 |------|------|--------------|
-| `/generate-idea` | Command | Interviews you about a concept, creates the idea folder structure, spins up transcript-generator, optionally spins up view-generator |
-| `transcript-generator` | Agent | Captures ideation conversations as transcripts; has access to conversation context; preserves ideas, reasoning, emotional threads |
-| `view-generator` | Agent | Creates production content; loads full idea folder (README, transcripts, assets) before generating; walks through voice and style |
+| `/ideate` | Command | The primary command. Start or continue exploring an idea through guided conversation. Creates structure for new ideas, loads context for existing ones, captures transcript after. |
+| `/instantiate-idea` | Command | Create the folder structure for a new idea space. Called automatically by `/ideate` for new ideas, or run standalone to set up scaffolding. |
+| `/generate-view` | Command | Create production content (blog post, brief, essay, etc.). Interviews about voice and style, loads full idea context, generates structured views. |
+| `/generate-poem-view` | Command | Specialized poetry generation using Poetic Inquiry methodology. Interviews about form and rhyme preferences, then transmutes source material into high-literary verse. |
+| `transcript-generator` | Agent | Captures ideation conversations as transcripts; preserves ideas, reasoning, emotional threads. Spun up automatically after `/ideate`. |
 
-**Why agents instead of commands for transcript and view?**
+**Why is transcript-generator an agent?**
 
-Agents run in their own context. This means:
-- A long ideation conversation won't overflow context when capturing the transcript
-- View generation can happen in a fresh thread and still have full idea context (the agent loads it from files)
-- You can say "spin up view-generator for the consciousness idea" in any thread and it works
+Agents run in their own context. A long ideation conversation won't overflow context when capturing the transcript. The agent takes the conversation, condenses it, and writes the file; no further user input needed.
 
 ## How It Works
 
@@ -53,10 +50,12 @@ Agents run in their own context. This means:
 claude_writer/
 ├── .claude/
 │   ├── agents/              # Agent definitions
-│   │   ├── transcript-generator.md
-│   │   └── view-generator.md
+│   │   └── transcript-generator.md
 │   └── commands/            # Command definitions
-│       └── generate-idea.md
+│       ├── ideate.md
+│       ├── instantiate-idea.md
+│       ├── generate-view.md
+│       └── generate-poem-view.md
 ├── ideas/                   # Idea spaces
 │   └── NNNN-name/           # Numbered, kebab-case
 │       ├── README.md        # Summary, origin, open questions

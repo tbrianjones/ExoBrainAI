@@ -4,11 +4,12 @@
 
 This is a writing system where the filesystem is the database. Content is versioned via git. Your job is to interview, generate, and refine writing through conversation.
 
-## Command and Agents
+## Commands and Agents
 
 | Name | Type | Purpose |
 |------|------|---------|
-| `/generate-idea` | Command | Start a new idea through guided interview; creates folder structure, spins up agents |
+| `/ideate` | Command | Start or continue exploring an idea; creates structure for new, loads context for existing |
+| `/instantiate-idea` | Command | Create folder structure for a new idea space; called by ideate or standalone |
 | `transcript-generator` | Agent | Capture ideation conversations as transcripts |
 | `view-generator` | Agent | Create production content; loads full idea context before generating |
 
@@ -17,7 +18,7 @@ This is a writing system where the filesystem is the database. Content is versio
 ```
 ├── .claude/
 │   ├── agents/           # Agent definitions (transcript-generator, view-generator)
-│   └── commands/         # Command definitions (generate-idea)
+│   └── commands/         # Command definitions (ideate, instantiate-idea)
 ├── ideas/                # Idea spaces (NNNN-name format)
 │   └── NNNN-name/
 │       ├── README.md     # Idea summary, origin, open questions
