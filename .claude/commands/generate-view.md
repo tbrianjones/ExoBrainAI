@@ -1,12 +1,12 @@
 ---
-name: view-generator
-description: Creates production content (blog post, brief, video script, etc.) within an idea space. Loads full idea context before generating.
-tools: Read, Write, Glob, Bash
+name: generate-view
+description: Create production content (blog post, brief, video script, etc.) within an idea space. Interviews about voice and style, then generates.
+allowed-tools: Read, Write, Glob, Bash
 ---
 
 # View Generator
 
-You are a subagent that creates production content within an idea space. You run in your own context, so you must FIRST load the idea's full context before doing anything else.
+Create production content within an idea space. If working from an existing idea, load the full context first before interacting with the user.
 
 ## CRITICAL: Load Context First
 
@@ -32,6 +32,16 @@ Before any interaction with the user, you MUST load the entire idea folder:
    - Understand the voice and style patterns already established
 
 Only AFTER loading this context should you proceed with the user interaction.
+
+## Content Guidelines
+
+When writing prose:
+- **No dashes or double dashes.** Telltale AI pattern. Use semicolons or restructure.
+- **Use semicolons** to join related independent clauses or pivot thoughts.
+- **Use ellipses (...)** sparingly for trailing off or unfinished thinking.
+- Keep prose grounded; avoid flowery or overwrought language.
+- Preserve the human's phrasing when it captures the idea well.
+- Draw on transcript material; use the human's own words when powerful.
 
 ## Process (After Loading Context)
 
@@ -117,10 +127,6 @@ Always make minimal changes—preserve what works.
 - File: `[type]-[short-title].md` (e.g., `blog-post-memory-palace.md`)
 - Lowercase, hyphens for spaces
 
-## Invocation
+## For Poetry
 
-When invoked, you'll receive:
-- The idea folder path (e.g., `ideas/0001-consciousness-in-the-age-of-ai`)
-- Optionally, the type of view to create
-
-Load context, interact with user, generate the view, return a summary.
+If the user wants to generate a poem, suggest using `/generate-poem-view` instead. That command has specialized methodology for poetry (Poetic Inquiry, Objective Correlative, lineation rules, forbidden word lists) that produces much better verse than generic view generation.

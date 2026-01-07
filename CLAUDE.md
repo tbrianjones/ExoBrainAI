@@ -1,63 +1,62 @@
 # Claude Writer
 
-## Working in This Repo
+Filesystem is the database. Git versions content.
 
-This is a writing system where the filesystem is the database. Content is versioned via git. Your job is to interview, generate, and refine writing through conversation.
+## Commands vs Agents
 
-## Commands and Agents
+**Commands** interview the user, have dialogue, require input.
+**Agents** run autonomously in their own context, no further input needed.
 
-| Name | Type | Purpose |
-|------|------|---------|
-| `/ideate` | Command | Start or continue exploring an idea; creates structure for new, loads context for existing |
-| `/instantiate-idea` | Command | Create folder structure for a new idea space; called by ideate or standalone |
-| `transcript-generator` | Agent | Capture ideation conversations as transcripts |
-| `view-generator` | Agent | Create production content; loads full idea context before generating |
+## Commands
+
+| Command | When to Use |
+|---------|-------------|
+| `/ideate` | User wants to explore an idea (new or existing) |
+| `/instantiate-idea` | Create folder structure; usually called by /ideate |
+| `/generate-view` | User wants production content from an idea |
+| `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
+
+## Agents
+
+| Agent | Invocation |
+|-------|------------|
+| `transcript-generator` | Spun up after /ideate to capture conversation |
 
 ## Folder Structure
 
 ```
 ├── .claude/
-│   ├── agents/           # Agent definitions (transcript-generator, view-generator)
-│   └── commands/         # Command definitions (ideate, instantiate-idea)
-├── ideas/                # Idea spaces (NNNN-name format)
-│   └── NNNN-name/
-│       ├── README.md     # Idea summary, origin, open questions
-│       ├── assets/       # Characters, settings, concepts, objects
-│       ├── transcripts/  # Raw ideation captures
-│       └── views/        # Production content
-├── templates/styles/     # Writing style references
-└── doc_load/             # Source material and writing samples
+│   ├── agents/           # transcript-generator
+│   └── commands/         # ideate, instantiate-idea, generate-view, generate-poem-view
+├── ideas/NNNN-name/
+│   ├── README.md         # Idea summary, origin, open questions
+│   ├── assets/           # Structured entities (characters, settings, concepts)
+│   ├── transcripts/      # Raw ideation captures
+│   └── views/            # Production content
+└── templates/styles/     # Writing style references
 ```
 
 ## Working in Idea Spaces
 
-When working in `ideas/NNNN-name/`:
-- **Load the full context first**: README, all transcripts, all assets
-- Assets inform voice, details, and consistency across all views
-- The view-generator agent does this automatically; if working manually, do it yourself
+Before generating content in `ideas/NNNN-name/`:
 
-## Content Production Guidelines
+1. Read `README.md`
+2. Read all files in `transcripts/`
+3. Read all files in `assets/`
+4. Scan `views/` for existing voice/style patterns
 
-**Style rules for all generated prose:**
+Commands `/generate-view` and `/generate-poem-view` do this automatically.
 
-- **Avoid dashes and double dashes.** Telltale AI pattern. Use semicolons or restructure.
-- **Use semicolons** to join related independent clauses or pivot thoughts.
-- **Use ellipses (...)** sparingly for trailing off or unfinished thinking.
-- Write in the voice and style defined in the view's metadata.
-- Preserve the human's phrasing when it captures the idea well.
-- Keep prose grounded; avoid flowery or overwrought language.
-
-**View file structure:**
+## View File Format
 
 ```yaml
 ---
 title: [Title]
-type: [blog-post | brief | video-script | essay | infographic | ...]
+type: [blog-post | brief | video-script | essay | poem | ...]
 status: [outline | draft | review | final]
 audience: [who this is for]
-voice: [description of tone, personality, perspective]
+voice: [tone, personality, perspective]
 style:
-  [attribute]: [0-100]
   [attribute]: [0-100]
 ---
 ```
@@ -67,15 +66,26 @@ style:
 [Structural skeleton]
 
 ## Content
-[Prose organized by section]
+[Prose by section]
 ```
 
-## Transcripts
+## Transcript File Format
 
-Transcripts capture the creative essence of conversations. Focus on:
-- Concepts and ideas as they emerged
-- Reasoning and thought processes
-- Emotional threads and key realizations
-- The human's voice and phrasing
+```markdown
+# [Topic Title]
+- person: [name]
+- ai: [model]
+- emotional analysis: [tags]
 
-Ignore: tool calls, file operations, implementation details, debugging.
+## Ideas & Themes
+## Transcript Summary
+## Full Transcript
+```
+
+## Style Rules
+
+- **No dashes or double dashes.** Use semicolons or restructure.
+- **Semicolons** join related independent clauses.
+- **Ellipses** for trailing off (use sparingly).
+- Preserve human's phrasing when it captures the idea.
+- Avoid flowery language.
