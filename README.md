@@ -8,7 +8,7 @@ Interview-driven writing system. You talk; Claude interviews; the system capture
 2. Run `/ideate` (or say "I want to ideate on something")
 3. Talk through your idea; Claude handles the rest
 
-Voice interface recommended: [Wispr Flow](https://wispr.flow) or similar.
+Voice interface recommended: [Wispr Flow](https://wisprflow.ai/) or similar.
 
 ## Commands
 
