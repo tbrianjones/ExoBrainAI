@@ -15,6 +15,7 @@ Voice interface recommended: [Wispr Flow](https://wispr.flow) or similar.
 | Command | Purpose |
 |---------|---------|
 | `/ideate` | Start or continue exploring an idea through guided interview |
+| `/generate-transcript` | Capture current conversation as a transcript |
 | `/generate-view` | Create production content (blog post, brief, essay, etc.) |
 | `/generate-poem-view` | Generate poetry using Poetic Inquiry methodology |
 
