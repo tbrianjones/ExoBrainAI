@@ -21,7 +21,7 @@ Filesystem is the database. Git versions content.
 
 | Agent | Invocation |
 |-------|------------|
-| `transcript-generator` | Spun up after /ideate to capture conversation |
+| `transcript-generator` | Called by `/genreate-transcript` or spun up directly in a thread after `/ideate` to capture conversation |
 
 ## Folder Structure
 

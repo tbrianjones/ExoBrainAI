@@ -1,6 +1,6 @@
 ---
 name: transcript-generator
-description: Distills an ideation conversation into a preserved transcript. Use after /generate-idea or any rich ideation session.
+description: Distills an ideation conversation into a preserved transcript. Use after /ideate or any rich ideation session.
 tools: Read, Write, Glob
 ---
 
