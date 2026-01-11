@@ -35,8 +35,10 @@ claude_writer/
 │       ├── transcripts/# Raw ideation captures
 │       └── views/      # Production content
 └── templates/
-    ├── styles/         # Writing style references
-    └── infographics/   # Framework documentation
+    ├── voices/             # Writing voice/style references
+    ├── poetry/             # Poetry generation frameworks
+    ├── infographics/       # Infographic generation frameworks
+    └── command-generation/ # Meta-command frameworks
 ```
 
 ## Future
