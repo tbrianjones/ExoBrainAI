@@ -1,0 +1,50 @@
+---
+title: "Look At These Ridiculous Numbers"
+description: "Two months of Claude Code usage and what it would've cost me at API rates"
+author: "T. Brian Jones"
+date: "2026-01-11"
+categories: [claude-code, token-economics, api-pricing, ai-costs, developer-tools]
+---
+
+I ran out of Claude Code credits and fell down a rabbit hole. Here's the damage.
+
+### What I Actually Used (8 weeks)
+
+This is raw token consumption across models. Note: 92% of those tokens are "cache reads" which I'll explain in a sec.
+
+| Model | Input | Output | Cache Read | Cache Write | Total |
+|-------|------:|-------:|-----------:|------------:|------:|
+| Opus 4.5 | 950,860 | 2,588,991 | 1,358,438,079 | 122,308,882 | **1,484,286,812** |
+| Sonnet 4.5 | 201,228 | 4,151,480 | 684,762,875 | 50,804,886 | **739,920,469** |
+| Opus 4.1 | 708 | 67,469 | 6,475,584 | 464,816 | **7,008,577** |
+| Haiku 4.5 | 96 | 139 | 266,580 | 67,004 | **333,819** |
+| **TOTAL** | **1,152,892** | **6,808,079** | **2,049,943,118** | **173,645,588** | **2,231,549,677** |
+
+Yes, 2.2 billion tokens. But here's the thing: every message you send in Claude Code includes the ENTIRE conversation history. So the context gets re-sent constantly. Prompt caching means if it's already been sent, you pay 10% of normal price. That's what "cache read" means. It's how this doesn't bankrupt everyone.
+
+### What That Would've Cost at API Rates
+
+Using Anthropic's published pricing (January 2025):
+
+| Model | Input | Output | Cache Read | Cache Write | **Total** |
+|-------|------:|-------:|-----------:|------------:|----------:|
+| Opus 4.5 | $14.26 | $194.17 | $2,037.66 | $2,293.29 | **$4,539.39** |
+| Sonnet 4.5 | $0.60 | $62.27 | $205.43 | $190.52 | **$458.82** |
+| Opus 4.1 | $0.01 | $5.06 | $9.71 | $8.72 | **$23.50** |
+| Haiku 4.5 | $0.00 | $0.00 | $0.02 | $0.07 | **$0.09** |
+| **TOTAL** | **$14.87** | **$261.51** | **$2,252.82** | **$2,492.59** | **$5,021.80** |
+
+**I paid $200 (two months of the $100 Max plan). API equivalent: $5,021.80. That's a 25x value multiplier.**
+
+### If You Maxed Out the Subscription
+
+This is the wild part. Anthropic publishes weekly usage limits. If you used every single hour they allow:
+
+| Plan | Monthly Cost | Maxed API Equivalent | Value Multiplier |
+|------|-------------:|---------------------:|-----------------:|
+| Max 5x | $100 | ~$20,750 | **~208x** |
+| Max 20x | $200 | ~$33,500 | **~168x** |
+
+I'm apparently using about 12% of what the plan allows. Someone grinding harder than me is getting 200x value.
+
+Anthropic is either losing money on power users, betting inference costs drop fast, or both. Either way: good deal.
