@@ -4,13 +4,18 @@ Talk through your ideas; Claude interviews you and produces written content.
 
 ## Overview
 
-Idea Writer uses Claude Projects on claude.ai for ideation and content generation. Transcripts and views are created as artifacts, downloaded, and uploaded to the Project's Knowledge Base for persistence across conversations.
+Idea Writer offers two ways to work:
+
+1. **Claude Projects** (Browser) - Use claude.ai with Custom Instructions and Knowledge Base for persistence
+2. **Claude Code** (Terminal) - Use the desktop app with slash commands and local file storage
+
+Both workflows produce the same output: idea spaces with transcripts and views stored in the `ideas/` folder.
 
 ## Architecture
 
-1. **Claude Project** - Persistent workspace on claude.ai with Custom Instructions and Knowledge Base
-2. **Artifacts** - Transcripts and views generated during conversations
-3. **Web GUI** - Optional Flask app for browsing downloaded ideas locally
+1. **Claude Project / Claude Code** - The AI interface for ideation
+2. **Transcripts & Views** - Generated as artifacts (Projects) or saved directly (Code)
+3. **Web GUI** - Optional Flask app for browsing ideas locally
 
 ## Project Structure
 

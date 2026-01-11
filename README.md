@@ -2,54 +2,111 @@
 
 Talk through your ideas; Claude interviews you and produces written content.
 
-## How It Works
+## Two Ways to Use Idea Writer
 
-Idea Writer runs inside a Claude Project on claude.ai. Your ideas persist across conversations through uploaded transcripts and the Knowledge Base.
+Choose the approach that fits how you prefer to work.
 
-**The workflow:**
-1. **Ideate** - Claude interviews you to explore an idea
-2. **Capture** - Claude creates a transcript artifact
-3. **Save** - Download the artifact and upload to your Project's Knowledge Base
-4. **Generate** - Claude reads your transcripts and creates polished content
+### Option A: Claude Projects (Browser)
 
-## Quick Start
+Use Idea Writer in your web browser at claude.ai. Ideas persist through the Project's Knowledge Base.
 
-### 1. Create a Claude Project
+**How it works:**
+1. Create a Claude Project
+2. Add Custom Instructions from `skill/CUSTOM_INSTRUCTIONS.md`
+3. Ideate through conversation
+4. Claude creates artifacts (transcripts, views)
+5. Download artifacts and upload to Knowledge Base for future sessions
+
+**Best for:** Browser-based workflow, no local setup required.
+
+**Requires:** Claude Pro or Max subscription
+
+**Setup guide:** [skill/SETUP.md](skill/SETUP.md)
+
+---
+
+### Option B: Claude Code (Terminal)
+
+Use Idea Writer with the Claude Code desktop app. Ideas persist in local folders managed by git.
+
+**How it works:**
+1. Open this project in Claude Code
+2. Run `/ideate` to explore ideas
+3. Claude saves transcripts directly to `ideas/` folder
+4. Run `/generate-view` to create content
+5. Everything is versioned with git
+
+**Best for:** Terminal workflow, local file management, git version control.
+
+**Requires:** Claude Code desktop app (free with Claude subscription)
+
+**Setup guide:** See "Claude Code Setup" section below
+
+---
+
+## Claude Projects Setup
+
+### Step 1: Create Project
 
 1. Go to [claude.ai](https://claude.ai)
-2. Click **Projects** → **New Project**
-3. Name it "Idea Writer" (or whatever you prefer)
+2. Click **Projects** in the sidebar
+3. Click **New Project**
+4. Name it "Idea Writer" (or your preference)
 
-### 2. Add Custom Instructions
+### Step 2: Add Custom Instructions
 
 1. Click **Edit project details** (pencil icon)
 2. Open `skill/CUSTOM_INSTRUCTIONS.md` from this repo
-3. Copy the instructions (everything below the `---` line)
+3. Copy everything below the `---` line
 4. Paste into the Custom Instructions field
 5. Save
 
-### 3. Add Voice Templates (Optional)
+### Step 3: Add Voice Templates (Optional)
 
 Upload files from `skill/templates/voices/` to your Project's Knowledge Base:
 - `professional-communication.md`
 - `conversational-expert.md`
 - `exploratory-thinker.md`
 
-### 4. Start Ideating
+### Step 4: Start Ideating
 
-In your project, start a new chat and say:
+Start a new chat in your project and say:
 
 > "Let's ideate on [your topic]"
 
-Claude will interview you. When finished, say:
+When finished, say:
 
 > "Capture this as a transcript"
 
-Download the artifact and upload it to your Knowledge Base for future reference.
+Download the artifact and upload to your Knowledge Base for future reference.
 
 ---
 
-## Commands
+## Claude Code Setup
+
+### Step 1: Install Claude Code
+
+Download from [claude.ai/download](https://claude.ai/download)
+
+### Step 2: Open This Project
+
+Launch Claude Code and open the `idea-writer` folder.
+
+### Step 3: Run Setup (First Time)
+
+```
+./scripts/init.sh
+```
+
+### Step 4: Start Ideating
+
+Type `/ideate` and describe what you want to explore.
+
+---
+
+## Commands Reference
+
+### Claude Projects (Natural Language)
 
 | Say This | Claude Will |
 |----------|-------------|
@@ -58,25 +115,28 @@ Download the artifact and upload it to your Knowledge Base for future reference.
 | "Capture this as a transcript" | Create a transcript artifact |
 | "Generate a blog post about X" | Create content from your transcripts |
 | "Use the conversational voice" | Apply a voice template |
-| "What ideas do I have?" | List ideas in Knowledge Base |
+
+### Claude Code (Slash Commands)
+
+| Command | What It Does |
+|---------|--------------|
+| `/ideate` | Explore an idea through conversation |
+| `/generate-transcript` | Save the current conversation |
+| `/generate-view` | Create content from an idea space |
+| `/generate-poem-view` | Generate poetry |
+| `/generate-academic-infographic-view` | Create infographic specs |
 
 ---
 
 ## Web GUI (Optional)
 
-Browse your ideas locally with a simple web interface.
+Browse your ideas through a web interface. Works with either workflow.
 
-**Running:**
 ```bash
 python app.py
 ```
 
-**Features:**
-- Homepage listing all idea spaces
-- Detail pages for transcripts and views
-- Markdown rendering with syntax highlighting
-
-The web GUI reads from the `ideas/` folder. Organize your downloaded artifacts there if you want to browse them locally.
+The web GUI reads from the `ideas/` folder. Organize your downloaded artifacts (Claude Projects) or let Claude Code save directly there.
 
 ---
 
@@ -85,33 +145,19 @@ The web GUI reads from the `ideas/` folder. Organize your downloaded artifacts t
 ```
 idea-writer/
 ├── skill/
-│   ├── CUSTOM_INSTRUCTIONS.md  # Paste into Claude Project
-│   ├── SETUP.md                # Detailed setup guide
+│   ├── CUSTOM_INSTRUCTIONS.md  # For Claude Projects
+│   ├── SETUP.md                # Claude Projects setup guide
 │   └── templates/
 │       ├── voices/             # Writing style templates
-│       └── specialized/        # Poetry, infographics, etc.
-├── ideas/                      # Your downloaded idea spaces
-├── app.py                      # Flask web GUI
+│       └── specialized/        # Poetry, infographics
+├── .claude/
+│   ├── commands/               # For Claude Code
+│   ├── agents/
+│   └── skills/
+├── ideas/                      # Your idea spaces
+├── app.py                      # Web GUI
 ├── templates/                  # HTML templates
 └── static/                     # CSS styles
-```
-
----
-
-## Organizing Your Ideas
-
-Recommended folder structure for downloaded artifacts:
-
-```
-ideas/
-├── 0001-my-first-idea/
-│   ├── readme.md
-│   ├── transcripts/
-│   │   └── transcript-2026-01-11.md
-│   └── views/
-│       └── view-blog-post.md
-└── 0002-another-idea/
-    └── ...
 ```
 
 ---
@@ -126,7 +172,9 @@ Three voices are included:
 | Conversational Expert | Blog posts, tutorials |
 | Exploratory Thinker | Essays, thought pieces |
 
-Upload them to your Knowledge Base, then say "Use the [name] voice" when generating content.
+**Claude Projects:** Upload to Knowledge Base, then say "Use the [name] voice"
+
+**Claude Code:** Templates are available automatically via `/generate-view`
 
 ---
 
@@ -141,19 +189,40 @@ Find these in `skill/templates/specialized/`.
 
 ---
 
+## Organizing Your Ideas
+
+Both workflows use the same folder structure:
+
+```
+ideas/
+├── 0001-my-first-idea/
+│   ├── README.md
+│   ├── transcripts/
+│   │   └── transcript-2026-01-11.md
+│   └── views/
+│       └── view-blog-post.md
+└── 0002-another-idea/
+    └── ...
+```
+
+---
+
 ## Tips
 
-**Build context over time**: The more transcripts you upload, the richer your generated content becomes.
+**Build context over time**: Multiple ideation sessions on one topic create richer content.
 
-**One project per major topic**: Keep unrelated ideas in separate projects.
+**One project per major topic**: Keep unrelated ideas separate.
 
-**Download and organize**: Artifacts in chat don't automatically persist. Download what you want to keep.
+**Revisit and refine**: Ideas improve with multiple passes.
 
-**Revisit and refine**: Multiple ideation sessions on one topic build depth.
+**Download and organize**: (Claude Projects) Artifacts don't auto-persist; download what you want to keep.
 
 ---
 
 ## Requirements
 
-- Claude Pro or Max subscription (for Projects)
-- Python 3.11 (for optional web GUI)
+| Workflow | Requirements |
+|----------|--------------|
+| Claude Projects | Claude Pro or Max subscription |
+| Claude Code | Claude Code app (free with subscription) |
+| Web GUI | Python 3.11 |
