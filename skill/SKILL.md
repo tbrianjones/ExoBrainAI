@@ -1,5 +1,5 @@
 ---
-name: Claude Writer
+name: idea-writer
 description: Talk through your ideas; Claude interviews you and produces written content. Works with your GitHub repo to store ideas, transcripts, and views.
 ---
 
