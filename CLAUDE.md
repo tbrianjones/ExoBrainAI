@@ -2,10 +2,11 @@
 
 Filesystem is the database. Git versions content.
 
-## Commands vs Agents
+## Commands vs Agents vs Skills
 
 **Commands** interview the user, have dialogue, require input.
 **Agents** run autonomously in their own context, no further input needed.
+**Skills** are utilities invoked by commands or agents (not directly by users).
 
 ## Commands
 
@@ -23,14 +24,22 @@ Filesystem is the database. Git versions content.
 
 | Agent | Invocation |
 |-------|------------|
-| `transcript-generator` | Called by `/genreate-transcript` or spun up directly in a thread after `/ideate` to capture conversation |
+| `transcript-generator` | Called by `/generate-transcript` or spun up directly in a thread after `/ideate` to capture conversation |
+
+## Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `gemini` | Generate images (saved to idea views/) or text (returned to caller) via Google Gemini API |
 
 ## Folder Structure
 
 ```
 ├── .claude/
 │   ├── agents/           # transcript-generator
-│   └── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, generate-poem-view, generate-academic-infographic-view, generate-new-view
+│   ├── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, etc.
+│   └── skills/           # gemini
+├── scripts/              # Python utilities (gemini.py)
 ├── ideas/NNNN-name/
 │   ├── README.md         # Idea summary, origin, open questions
 │   ├── assets/           # Structured entities (characters, settings, concepts)
