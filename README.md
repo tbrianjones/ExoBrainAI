@@ -4,7 +4,7 @@ Talk through your ideas; Claude interviews you and produces written content.
 
 ## Two Ways to Use Claude Writer
 
-### Option 1: Claude Skill (Recommended)
+### Option 1: Claude Skill
 
 Use Claude Writer directly in Claude.ai with your Pro or Max subscription. No terminal needed.
 
