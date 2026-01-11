@@ -16,6 +16,7 @@ Filesystem is the database. Git versions content.
 | `/generate-transcript` | User wants to capture current conversation |
 | `/generate-view` | User wants production content from an idea |
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
+| `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
 
 ## Agents
 
@@ -28,13 +29,15 @@ Filesystem is the database. Git versions content.
 ```
 ├── .claude/
 │   ├── agents/           # transcript-generator
-│   └── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, generate-poem-view
+│   └── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, generate-poem-view, generate-academic-infographic-view
 ├── ideas/NNNN-name/
 │   ├── README.md         # Idea summary, origin, open questions
 │   ├── assets/           # Structured entities (characters, settings, concepts)
 │   ├── transcripts/      # Raw ideation captures
 │   └── views/            # Production content
-└── templates/styles/     # Writing style references
+└── templates/
+    ├── styles/           # Writing style references
+    └── infographics/     # Framework documentation for visual content
 ```
 
 ## Working in Idea Spaces
@@ -46,7 +49,7 @@ Before generating content in `ideas/NNNN-name/`:
 3. Read all files in `assets/`
 4. Scan `views/` for existing voice/style patterns
 
-Commands `/generate-view` and `/generate-poem-view` do this automatically.
+Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` do this automatically.
 
 ## Style Rules
 

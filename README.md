@@ -18,6 +18,7 @@ Voice interface recommended: [Wispr Flow](https://wisprflow.ai/) or similar.
 | `/generate-transcript` | Capture current conversation as a transcript |
 | `/generate-view` | Create production content (blog post, brief, essay, etc.) |
 | `/generate-poem-view` | Generate poetry using Poetic Inquiry methodology |
+| `/generate-academic-infographic-view` | Create academically rigorous infographic specifications |
 
 ## File Structure
 
@@ -32,7 +33,9 @@ claude_writer/
 │       ├── assets/     # Characters, settings, concepts
 │       ├── transcripts/# Raw ideation captures
 │       └── views/      # Production content
-└── templates/styles/   # Writing style references
+└── templates/
+    ├── styles/         # Writing style references
+    └── infographics/   # Framework documentation
 ```
 
 ## Future
