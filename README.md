@@ -2,65 +2,70 @@
 
 Talk through your ideas; Claude interviews you and produces written content.
 
-## Quick Start
+## Two Ways to Use Claude Writer
 
-### 1. Get the code
+### Option 1: Claude Skill (Recommended)
 
-Download this project to your computer:
-- **Option A**: On GitHub, click the green "Code" button → "Download ZIP" → unzip it
-- **Option B**: If you have git: `git clone https://github.com/tbrianjones/claude_writer.git`
+Use Claude Writer directly in Claude.ai with your Pro or Max subscription. No terminal needed.
 
-### 2. Install Claude Code
+**Setup:**
+1. Go to Claude.ai Settings → Skills
+2. Create a new skill named "Claude Writer"
+3. Paste the contents of `skill/SKILL.md`
+4. In any chat, click "+" to connect your GitHub repository
+5. Say "Let's ideate on [topic]" to start
 
-Download Claude Code from [claude.ai/download](https://claude.ai/download). This is the AI assistant that powers everything.
+**How it works:**
+- Claude interviews you through guided conversation
+- Transcripts and content are saved directly to your GitHub repo
+- Use the web GUI (see below) to browse your ideas
 
-### 3. Open the project
+See `skill/SETUP.md` for detailed instructions.
 
-Launch Claude Code. It will ask you to open a folder; select the `claude_writer` folder you downloaded.
+### Option 2: Claude Code (Desktop App)
 
-### 4. Run setup (one time)
+Use the Claude Code terminal app for a more hands-on experience.
 
-In the Claude Code chat, type:
-```
-./scripts/init.sh
-```
-
-This installs the required tools. You only need to do this once.
-
-### 5. Configure Gemini API (optional)
-
-Some features use Google Gemini for text and image generation:
-
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy the key and paste it into the `.env` file (replace `your-api-key-here`)
-
-**Free tier**: Text generation works without billing (1000 requests/day).
-
-**Paid tier**: Image generation requires billing. Enable at [Google Cloud Console](https://console.cloud.google.com/billing). Images cost ~$0.03 each.
-
-### 6. Start ideating
-
-Type `/ideate` and describe what you want to explore. Claude will interview you, capture your ideas, and help you produce content.
+**Setup:**
+1. Download Claude Code from [claude.ai/download](https://claude.ai/download)
+2. Open the `claude_writer` folder in Claude Code
+3. Run `./scripts/init.sh` to install dependencies
+4. Type `/ideate` to start exploring ideas
 
 ---
 
-## How It Works
+## Web GUI
 
-Claude Code is an AI assistant that runs in your terminal. You type messages; it responds, reads files, and runs the custom commands defined in this project.
+Browse and view your ideas through a web interface.
 
-**Voice input recommended**: Talking is faster than typing. Try [Wispr Flow](https://wisprflow.ai/) or your system's dictation.
+**Running locally:**
+```bash
+python app.py
+```
 
-**The workflow**:
-1. Create an "Idea Space": run `/ideate` to explore and capture ideas through conversation in custom "Idea Spaces." Treat each idea space as a knowledge base of everything you've talked about in that idea over time. After you've completed a conversation with Claude using the `/ideate` command, run `/generate_transcript` to create a transcript of that convo and ideas into that Idea Space. `/ideate` will do this for you the first time you run it.
-2. `/generate-view` turns captured ideas into polished content (blog posts, briefs, essays). YOu can generate infinite views on a single Idea Space. Specialized view generators (`/generate-poem-view`, etc.) aid in creating more powerful views.
+**Features:**
+- Homepage listing all idea spaces
+- Detail pages for transcripts, views, and assets
+- Markdown rendering with syntax highlighting
+- GitHub sync (see below)
 
-Your ideas and their views live in the `ideas/` folder. Each idea gets its own space with transcripts, assets, and views. Anything is regenerable at any time.
+### GitHub Sync
+
+Sync ideas from your GitHub repository to the web GUI:
+
+1. Set the `GITHUB_REPO_URL` environment variable:
+   - For public repos: `https://github.com/username/repo.git`
+   - For private repos: `https://<token>@github.com/username/repo.git`
+
+2. Click "Sync from GitHub" on the homepage
+
+3. Your ideas will be pulled from GitHub and displayed in the GUI
+
+**Tip:** Store tokens securely using environment variables or your platform's secrets manager.
 
 ---
 
-## Commands
+## Commands (Claude Code)
 
 | Command | What it does |
 |---------|--------------|
@@ -79,17 +84,90 @@ Your ideas and their views live in the `ideas/` folder. Each idea gets its own s
 
 ```
 claude_writer/
-├── ideas/           # Your idea spaces
-├── templates/       # Voice and format references
-├── scripts/         # Setup and utility scripts
+├── app.py               # Flask web application
+├── ideas/               # Your idea spaces
+├── skill/               # Claude Skill package
+│   ├── SKILL.md         # Main skill definition
+│   ├── SETUP.md         # Setup guide
+│   └── templates/       # Voice and format templates
+├── templates/           # HTML templates for web GUI
+├── static/              # CSS styles
+├── scripts/             # Setup and utility scripts
 └── .claude/
-    ├── commands/    # User-invoked commands
-    ├── agents/      # Autonomous subagents
-    └── skills/      # Utilities (gemini, etc.)
+    ├── commands/        # User-invoked commands
+    ├── agents/          # Autonomous subagents
+    └── skills/          # Utilities (gemini, etc.)
 ```
+
+---
+
+## Idea Space Structure
+
+Each idea gets its own folder:
+
+```
+ideas/0001-my-idea/
+├── README.md        # Idea summary and open questions
+├── transcripts/     # Raw conversation captures
+├── views/           # Generated content (blog posts, essays, etc.)
+└── assets/          # Supporting files (images, data, etc.)
+```
+
+---
+
+## Voice Templates
+
+Claude Writer includes voice templates for consistent content generation:
+
+| Voice | Best For |
+|-------|----------|
+| Professional Communication | Business writing, reports |
+| Conversational Expert | Blog posts, tutorials |
+| Exploratory Thinker | Essays, thought pieces |
+
+Find templates in `skill/templates/voices/`.
+
+---
+
+## Specialized Frameworks
+
+For specific content types:
+
+- **Poetry Framework**: Poetic Inquiry methodology with lineation rules
+- **Infographic Framework**: Visual content specifications
+
+Find frameworks in `skill/templates/specialized/`.
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `GEMINI_API_KEY` | Optional. Enables Gemini text/image generation |
+| `GITHUB_REPO_URL` | Optional. Enables GitHub sync in web GUI |
+
+### Gemini API (Optional)
+
+For text and image generation features:
+
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create an API key
+3. Set `GEMINI_API_KEY` environment variable
+
+**Free tier**: 1000 text requests/day
+**Paid tier**: Image generation (~$0.03 per image)
 
 ---
 
 ## Principles
 
-**Infrastructure as code.** Never configure infrastructure manually via cloud consoles or CLI calls. All configuration should be defined in repository files, version controlled, and deployed via push. If something needs to change in GitHub, cloud services, or any external system, express it in code.
+**Filesystem is the database.** Ideas live in folders. Git versions everything.
+
+**Interview, don't lecture.** Claude asks questions to draw out your thinking.
+
+**Transcripts are raw material.** Every conversation can become multiple views.
+
+**Infrastructure as code.** Configuration lives in the repo, not in cloud consoles.
