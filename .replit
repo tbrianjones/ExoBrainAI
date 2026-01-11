@@ -1,0 +1,29 @@
+modules = ["bash", "python-3.11"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Claude Writer"
+
+[[workflows.workflow]]
+name = "Claude Writer"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo \"Claude Writer - Python environment ready\" && python scripts/gemini.py --help && echo \"\" && echo \"Project setup complete. This is a CLI tool designed for Claude Code.\" && echo \"See README.md for usage instructions.\""
+
+[workflows.workflow.metadata]
+outputType = "console"
