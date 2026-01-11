@@ -70,7 +70,7 @@ Your ideas and their views live in the `ideas/` folder. Each idea gets its own s
 | `/generate-poem-view` | Generate poetry |
 | `/generate-academic-infographic-view` | Create infographic specifications |
 | `/generate-new-view-command` | Build a new view generator command |
-| `/generate-quarto-view` | Create publishable Quarto document with code/data |
+| `/generate-quarto-post` | Convert an existing view to Quarto format |
 | `/publish-quarto` | Deploy a Quarto view to ideas.tbrianjones.com |
 
 ---
