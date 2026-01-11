@@ -21,9 +21,18 @@ args = "Claude Writer"
 name = "Claude Writer"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "echo \"Claude Writer - Python environment ready\" && python scripts/gemini.py --help && echo \"\" && echo \"Project setup complete. This is a CLI tool designed for Claude Code.\" && echo \"See README.md for usage instructions.\""
+args = "python app.py"
+waitForPort = 5000
 
-[workflows.workflow.metadata]
-outputType = "console"
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "app:app"]

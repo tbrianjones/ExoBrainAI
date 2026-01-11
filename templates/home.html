@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Claude Writer - Your Ideas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Your Idea Spaces</h1>
+    <p class="subtitle">Browse and explore your captured ideas and generated content</p>
+</div>
+
+{% if not status.gemini_configured %}
+<div class="alert alert-info">
+    <strong>Getting Started:</strong> 
+    <a href="{{ url_for('setup') }}">Configure your API keys</a> to enable all features.
+</div>
+{% endif %}
+
+{% if ideas %}
+<div class="ideas-grid">
+    {% for idea in ideas %}
+    <a href="{{ url_for('idea_detail', idea_id=idea.id) }}" class="idea-card">
+        <h3>{{ idea.name }}</h3>
+        <p class="idea-id">{{ idea.id }}</p>
+        {% if idea.summary %}
+        <p class="idea-summary">{{ idea.summary }}</p>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h2>No Ideas Yet</h2>
+    <p>Start by opening this project in Claude Code and running <code>/ideate</code> to explore your first idea.</p>
+    <a href="{{ url_for('setup') }}" class="btn btn-primary">View Setup Guide</a>
+</div>
+{% endif %}
+{% endblock %}

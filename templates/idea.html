@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ idea.name }} - Claude Writer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('home') }}" class="back-link">Back to Ideas</a>
+    <h1>{{ idea.name }}</h1>
+</div>
+
+<div class="idea-content">
+    {% if idea.readme %}
+    <section class="content-section">
+        <h2>Overview</h2>
+        <div class="markdown-content">
+            {{ render_markdown(idea.readme)|safe }}
+        </div>
+    </section>
+    {% endif %}
+    
+    {% if idea.views %}
+    <section class="content-section">
+        <h2>Views</h2>
+        <p class="section-desc">Generated content from your ideas</p>
+        <div class="file-list">
+            {% for view in idea.views %}
+            <a href="{{ url_for('view_detail', idea_id=idea.id, filename=view.filename) }}" class="file-item">
+                <span class="file-icon">doc</span>
+                <span class="file-name">{{ view.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+    
+    {% if idea.transcripts %}
+    <section class="content-section">
+        <h2>Transcripts</h2>
+        <p class="section-desc">Raw ideation conversation captures</p>
+        <div class="file-list">
+            {% for transcript in idea.transcripts %}
+            <a href="{{ url_for('transcript_detail', idea_id=idea.id, filename=transcript.filename) }}" class="file-item">
+                <span class="file-icon">transcript</span>
+                <span class="file-name">{{ transcript.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+    
+    {% if idea.assets %}
+    <section class="content-section">
+        <h2>Assets</h2>
+        <p class="section-desc">Images and other files</p>
+        <div class="file-list">
+            {% for asset in idea.assets %}
+            <a href="{{ url_for('serve_asset', idea_id=idea.id, filename=asset.name) }}" class="file-item" target="_blank">
+                <span class="file-icon">asset</span>
+                <span class="file-name">{{ asset.name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

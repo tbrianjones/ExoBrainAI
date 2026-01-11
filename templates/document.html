@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Claude Writer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('idea_detail', idea_id=idea_id) }}" class="back-link">Back to Idea</a>
+    <span class="doc-type">{{ doc_type }}</span>
+    <h1>{{ title }}</h1>
+</div>
+
+<article class="document-content markdown-content">
+    {{ content|safe }}
+</article>
+{% endblock %}

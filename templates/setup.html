@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Setup - Claude Writer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Setup Guide</h1>
+    <p class="subtitle">Configure Claude Writer to get the most out of your ideation workflow</p>
+</div>
+
+<div class="setup-grid">
+    <section class="setup-card">
+        <div class="setup-header">
+            <h2>1. Claude Code</h2>
+            <span class="status-badge status-info">Required for ideation</span>
+        </div>
+        <div class="setup-content">
+            <p>Claude Code is the AI assistant that powers the ideation workflow. You'll use it to explore ideas, generate transcripts, and create views.</p>
+            
+            <h3>Installation Steps</h3>
+            <ol class="setup-steps">
+                <li>
+                    <strong>Download Claude Code</strong>
+                    <p>Visit <a href="https://claude.ai/download" target="_blank">claude.ai/download</a> and download the desktop app for your operating system.</p>
+                </li>
+                <li>
+                    <strong>Open this project</strong>
+                    <p>Launch Claude Code and select "Open Folder". Navigate to and select this claude_writer project folder.</p>
+                </li>
+                <li>
+                    <strong>Start ideating</strong>
+                    <p>In the Claude Code chat, type <code>/ideate</code> to begin exploring an idea. Claude will interview you and capture your thoughts.</p>
+                </li>
+            </ol>
+            
+            <h3>Available Commands</h3>
+            <table class="commands-table">
+                <tr><td><code>/ideate</code></td><td>Explore an idea through guided conversation</td></tr>
+                <tr><td><code>/generate-transcript</code></td><td>Save the current conversation</td></tr>
+                <tr><td><code>/generate-view</code></td><td>Create content (blog, brief, essay)</td></tr>
+                <tr><td><code>/generate-poem-view</code></td><td>Generate poetry</td></tr>
+            </table>
+        </div>
+    </section>
+    
+    <section class="setup-card">
+        <div class="setup-header">
+            <h2>2. Google AI Studio (Gemini)</h2>
+            {% if status.gemini_configured %}
+            <span class="status-badge status-success">Configured</span>
+            {% else %}
+            <span class="status-badge status-warning">Optional</span>
+            {% endif %}
+        </div>
+        <div class="setup-content">
+            <p>Gemini enables AI-powered text and image generation. Text generation is free; image generation requires billing.</p>
+            
+            <h3>Setup Steps</h3>
+            <ol class="setup-steps">
+                <li>
+                    <strong>Get an API Key</strong>
+                    <p>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>, sign in with Google, and click "Create API Key".</p>
+                </li>
+                <li>
+                    <strong>Add the key to Replit Secrets</strong>
+                    <p>In Replit, click the "Secrets" tab in the left sidebar (or press Ctrl+Shift+S). Add a new secret with key <code>GEMINI_API_KEY</code> and paste your API key as the value.</p>
+                </li>
+                <li>
+                    <strong>Restart the app</strong>
+                    <p>After adding the secret, restart the app for changes to take effect. Refresh this page to see the updated status.</p>
+                </li>
+            </ol>
+            
+            {% if status.gemini_configured %}
+            <div class="info-box" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3);">
+                <strong>API Key Status:</strong> Your Gemini API key is configured and ready to use.
+            </div>
+            {% else %}
+            <div class="info-box" style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3);">
+                <strong>API Key Status:</strong> No API key detected. Add <code>GEMINI_API_KEY</code> in the Secrets tab to enable Gemini features.
+            </div>
+            {% endif %}
+            
+            <div class="info-box">
+                <strong>Pricing:</strong>
+                <ul>
+                    <li>Text generation: Free (1000 requests/day)</li>
+                    <li>Image generation: Requires billing (~$0.03/image)</li>
+                </ul>
+                <p>Enable billing at <a href="https://console.cloud.google.com/billing" target="_blank">Google Cloud Console</a> if you want image generation.</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<section class="setup-card full-width">
+    <div class="setup-header">
+        <h2>Workflow Overview</h2>
+    </div>
+    <div class="setup-content">
+        <div class="workflow-diagram">
+            <div class="workflow-step">
+                <div class="step-number">1</div>
+                <h4>Ideate</h4>
+                <p>Run <code>/ideate</code> in Claude Code. Have a conversation to explore your idea.</p>
+            </div>
+            <div class="workflow-arrow"></div>
+            <div class="workflow-step">
+                <div class="step-number">2</div>
+                <h4>Capture</h4>
+                <p>Run <code>/generate-transcript</code> to save your conversation as a transcript.</p>
+            </div>
+            <div class="workflow-arrow"></div>
+            <div class="workflow-step">
+                <div class="step-number">3</div>
+                <h4>Create</h4>
+                <p>Run <code>/generate-view</code> to turn your ideas into polished content.</p>
+            </div>
+            <div class="workflow-arrow"></div>
+            <div class="workflow-step">
+                <div class="step-number">4</div>
+                <h4>Browse</h4>
+                <p>View your ideas and content in this web interface.</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
