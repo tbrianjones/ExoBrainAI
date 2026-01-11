@@ -1,6 +1,8 @@
 ---
 name: Claude Writer
 description: Talk through your ideas; Claude interviews you and produces written content. Works with your GitHub repo to store ideas, transcripts, and views.
+version: 1.0.0
+author: T. Brian Jones
 ---
 
 # Claude Writer
