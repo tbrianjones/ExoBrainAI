@@ -10,9 +10,9 @@ Publish a Quarto document from an idea space to the writing site. Handles the fu
 
 ## Prerequisites
 
-- Quarto must be installed locally (`brew install quarto`)
 - The writing-site repo must exist at `~/projects/writing-site`
 - The writing-site repo must be connected to GitHub
+- (Optional) Quarto installed locally for preview (`brew install quarto`)
 
 ## Process
 
@@ -43,14 +43,14 @@ cp [source-path]/quarto-[title].qmd ~/projects/writing-site/posts/YYYY-MM-DD-[sl
 # Look for: .csv, .json, .parquet, images/, data/
 ```
 
-### 4. Render locally (optional verification)
+### 4. (Optional) Preview locally
 
+If Quarto is installed, you can preview before pushing:
 ```bash
 cd ~/projects/writing-site
-quarto render posts/YYYY-MM-DD-[slug]/index.qmd
+quarto preview
 ```
-
-If render fails, report the error and stop. Do not push broken content.
+Opens at localhost:4321 with live reload.
 
 ### 5. Commit and push
 
