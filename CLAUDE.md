@@ -64,7 +64,7 @@ Before generating content in `ideas/NNNN-name/`:
 3. Read all files in `assets/`
 4. Scan `views/` for existing voice/style patterns
 
-Commands `/generate-view`, `/generate-poem-view`, `/generate-academic-infographic-view`, and `/generate-quarto-view` do this automatically.
+Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` do this automatically.
 
 ## Style Rules
 

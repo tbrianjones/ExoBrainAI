@@ -8,7 +8,7 @@ Talk through your ideas; Claude interviews you and produces written content.
 
 Download this project to your computer:
 - **Option A**: On GitHub, click the green "Code" button → "Download ZIP" → unzip it
-- **Option B**: If you have git: `git clone https://github.com/your-username/claude_writer.git`
+- **Option B**: If you have git: `git clone https://github.com/tbrianjones/claude_writer.git`
 
 ### 2. Install Claude Code
 
