@@ -19,6 +19,8 @@ Filesystem is the database. Git versions content.
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
 | `/generate-new-view` | User wants to create a new specialized view generator |
+| `/generate-quarto-view` | User wants publishable Quarto document with code/data/interactivity |
+| `/publish-quarto` | User wants to deploy a Quarto view to writing.tbryanjones.com |
 
 ## Agents
 
@@ -49,6 +51,7 @@ Filesystem is the database. Git versions content.
     ├── voices/             # Writing voice/style references
     ├── poetry/             # Poetry generation frameworks
     ├── infographics/       # Infographic generation frameworks
+    ├── quarto/             # Quarto post framework and reference
     └── command-generation/ # Meta-command frameworks
 ```
 
@@ -61,7 +64,7 @@ Before generating content in `ideas/NNNN-name/`:
 3. Read all files in `assets/`
 4. Scan `views/` for existing voice/style patterns
 
-Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` do this automatically.
+Commands `/generate-view`, `/generate-poem-view`, `/generate-academic-infographic-view`, and `/generate-quarto-view` do this automatically.
 
 ## Style Rules
 
@@ -74,3 +77,4 @@ Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infogr
 ## Behavior
 
 - Always do work in feature branches. Propose this as soon as you launch.
+- **Infrastructure as code.** Never configure infrastructure manually via cloud consoles or CLI calls to services. All configuration should be defined in repository files, version controlled, and deployed via push. If something needs to change in GitHub, cloud services, or any external system, express it in code.

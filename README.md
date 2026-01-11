@@ -70,6 +70,8 @@ Your ideas and their views live in the `ideas/` folder. Each idea gets its own s
 | `/generate-poem-view` | Generate poetry |
 | `/generate-academic-infographic-view` | Create infographic specifications |
 | `/generate-new-view` | Build a new content generator |
+| `/generate-quarto-view` | Create publishable Quarto document with code/data |
+| `/publish-quarto` | Deploy a Quarto view to writing.tbryanjones.com |
 
 ---
 
@@ -85,3 +87,9 @@ claude_writer/
     ├── agents/      # Autonomous subagents
     └── skills/      # Utilities (gemini, etc.)
 ```
+
+---
+
+## Principles
+
+**Infrastructure as code.** Never configure infrastructure manually via cloud consoles or CLI calls. All configuration should be defined in repository files, version controlled, and deployed via push. If something needs to change in GitHub, cloud services, or any external system, express it in code.
