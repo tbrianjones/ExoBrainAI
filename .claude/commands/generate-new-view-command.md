@@ -1,5 +1,5 @@
 ---
-name: generate-new-view
+name: generate-new-view-command
 description: Create a new specialized view generator command. Interviews about the view type, researches frameworks, and produces both a framework document and a generate command.
 allowed-tools: Read, Write, Glob, Bash, Task, WebSearch, WebFetch
 ---

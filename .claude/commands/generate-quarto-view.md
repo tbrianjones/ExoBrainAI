@@ -1,6 +1,6 @@
 ---
 name: generate-quarto-view
-description: Create a Quarto document (.qmd) for publishing to writing.tbryanjones.com. Supports interactive elements, code, and data visualizations.
+description: Create a Quarto document (.qmd) for publishing to ideas.tbrianjones.com. Supports interactive elements, code, and data visualizations.
 allowed-tools: Read, Write, Glob, Bash
 ---
 
