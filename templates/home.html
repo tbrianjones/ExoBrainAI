@@ -4,9 +4,33 @@
 
 {% block content %}
 <div class="page-header">
-    <h1>Your Idea Spaces</h1>
-    <p class="subtitle">Browse and explore your captured ideas and generated content</p>
+    <div class="header-row">
+        <div>
+            <h1>Your Idea Spaces</h1>
+            <p class="subtitle">Browse and explore your captured ideas and generated content</p>
+        </div>
+        {% if status.github_configured %}
+        <div class="sync-section">
+            <button id="sync-btn" class="btn btn-secondary" onclick="syncFromGitHub()">
+                <span id="sync-text">Sync from GitHub</span>
+                <span id="sync-spinner" class="spinner" style="display: none;"></span>
+            </button>
+            {% if status.last_sync %}
+            <p class="sync-status" id="sync-status">
+                {% if status.last_sync.success %}
+                <span class="status-dot status-success-dot"></span>
+                {% else %}
+                <span class="status-dot status-error-dot"></span>
+                {% endif %}
+                Last synced: {{ status.last_sync.timestamp[:16].replace('T', ' ') }}
+            </p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
 </div>
+
+<div id="sync-message" class="alert" style="display: none;"></div>
 
 {% if not status.gemini_configured %}
 <div class="alert alert-info">
@@ -31,7 +55,49 @@
 <div class="empty-state">
     <h2>No Ideas Yet</h2>
     <p>Start by opening this project in Claude Code and running <code>/ideate</code> to explore your first idea.</p>
+    {% if status.github_configured %}
+    <p>Or sync your ideas from GitHub using the button above.</p>
+    {% endif %}
     <a href="{{ url_for('setup') }}" class="btn btn-primary">View Setup Guide</a>
 </div>
+{% endif %}
+
+{% if status.github_configured %}
+<script>
+async function syncFromGitHub() {
+    const btn = document.getElementById('sync-btn');
+    const text = document.getElementById('sync-text');
+    const spinner = document.getElementById('sync-spinner');
+    const msgEl = document.getElementById('sync-message');
+    
+    btn.disabled = true;
+    text.textContent = 'Syncing...';
+    spinner.style.display = 'inline-block';
+    msgEl.style.display = 'none';
+    
+    try {
+        const response = await fetch('/sync', { method: 'POST' });
+        const data = await response.json();
+        
+        msgEl.style.display = 'block';
+        if (data.success) {
+            msgEl.className = 'alert alert-success';
+            msgEl.innerHTML = '<strong>Success:</strong> ' + data.message;
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            msgEl.className = 'alert alert-error';
+            msgEl.innerHTML = '<strong>Error:</strong> ' + data.message;
+        }
+    } catch (error) {
+        msgEl.style.display = 'block';
+        msgEl.className = 'alert alert-error';
+        msgEl.innerHTML = '<strong>Error:</strong> Failed to sync. Please try again.';
+    } finally {
+        btn.disabled = false;
+        text.textContent = 'Sync from GitHub';
+        spinner.style.display = 'none';
+    }
+}
+</script>
 {% endif %}
 {% endblock %}

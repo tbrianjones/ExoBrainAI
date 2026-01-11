@@ -82,6 +82,12 @@ This is the key step that enables file storage:
 - Delete files or folders
 - Access repos you haven't explicitly connected
 
+**For private repositories:**
+Use HTTPS with a Personal Access Token in the URL format:
+`https://<your-token>@github.com/username/repo.git`
+
+Store tokens securely using environment variables or your platform's secrets manager (e.g., Replit Secrets).
+
 ## Step 5: Verify It's Working
 
 Start a conversation and say:

@@ -1,6 +1,9 @@
 import os
+import subprocess
+import json
+from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, abort, send_from_directory
+from flask import Flask, render_template, abort, send_from_directory, jsonify
 import markdown
 from markdown.extensions.fenced_code import FencedCodeExtension
 from markdown.extensions.codehilite import CodeHiliteExtension
@@ -9,6 +12,84 @@ from markdown.extensions.tables import TableExtension
 app = Flask(__name__)
 
 IDEAS_DIR = Path("ideas")
+LAST_SYNC_FILE = Path(".last_sync")
+
+def get_sync_status():
+    if not LAST_SYNC_FILE.exists():
+        return None
+    try:
+        data = json.loads(LAST_SYNC_FILE.read_text())
+        return data
+    except:
+        return None
+
+def save_sync_status(success, message):
+    data = {
+        'timestamp': datetime.now().isoformat(),
+        'success': success,
+        'message': message
+    }
+    LAST_SYNC_FILE.write_text(json.dumps(data))
+
+def sync_from_github():
+    import shutil
+    
+    repo_url = os.environ.get('GITHUB_REPO_URL', '').strip()
+    if not repo_url:
+        save_sync_status(False, "No GITHUB_REPO_URL configured")
+        return False, "No GITHUB_REPO_URL configured"
+    
+    ideas_git_dir = IDEAS_DIR / ".git"
+    
+    try:
+        if ideas_git_dir.exists():
+            result = subprocess.run(
+                ['git', 'pull', '--ff-only'],
+                cwd=IDEAS_DIR,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or result.stdout.strip()
+                if 'Authentication failed' in error_msg or 'could not read Username' in error_msg:
+                    msg = "Authentication required. For private repos, use HTTPS with a token."
+                    save_sync_status(False, msg)
+                    return False, msg
+                msg = f"Git pull failed: {error_msg[:200]}"
+                save_sync_status(False, msg)
+                return False, msg
+            save_sync_status(True, "Successfully pulled latest changes")
+            return True, "Successfully pulled latest changes"
+        else:
+            if IDEAS_DIR.exists():
+                shutil.rmtree(IDEAS_DIR)
+            
+            result = subprocess.run(
+                ['git', 'clone', repo_url, str(IDEAS_DIR)],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() or result.stdout.strip()
+                if 'Authentication failed' in error_msg or 'could not read Username' in error_msg:
+                    msg = "Authentication required. For private repos, use HTTPS with a token."
+                    save_sync_status(False, msg)
+                    return False, msg
+                msg = f"Git clone failed: {error_msg[:200]}"
+                save_sync_status(False, msg)
+                return False, msg
+            save_sync_status(True, "Successfully cloned repository")
+            return True, "Successfully cloned repository"
+    except subprocess.TimeoutExpired:
+        msg = "Git operation timed out"
+        save_sync_status(False, msg)
+        return False, msg
+    except Exception as e:
+        msg = f"Sync error: {str(e)[:200]}"
+        save_sync_status(False, msg)
+        return False, msg
 
 def get_idea_spaces():
     if not IDEAS_DIR.exists():
@@ -106,8 +187,14 @@ def check_setup_status():
     api_key = os.environ.get('GEMINI_API_KEY', '')
     gemini_configured = bool(api_key and api_key != 'your-api-key-here')
     
+    github_repo_url = os.environ.get('GITHUB_REPO_URL', '').strip()
+    sync_status = get_sync_status()
+    
     return {
-        'gemini_configured': gemini_configured
+        'gemini_configured': gemini_configured,
+        'github_repo_url': github_repo_url,
+        'github_configured': bool(github_repo_url),
+        'last_sync': sync_status
     }
 
 @app.route('/')
@@ -158,6 +245,15 @@ def serve_asset(idea_id, filename):
 def setup():
     status = check_setup_status()
     return render_template('setup.html', status=status)
+
+@app.route('/sync', methods=['POST'])
+def sync():
+    success, message = sync_from_github()
+    return jsonify({
+        'success': success,
+        'message': message,
+        'sync_status': get_sync_status()
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
