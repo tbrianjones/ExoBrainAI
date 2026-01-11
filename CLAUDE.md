@@ -17,6 +17,7 @@ Filesystem is the database. Git versions content.
 | `/generate-view` | User wants production content from an idea |
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
+| `/generate-new-view` | User wants to create a new specialized view generator |
 
 ## Agents
 
@@ -29,7 +30,7 @@ Filesystem is the database. Git versions content.
 ```
 ├── .claude/
 │   ├── agents/           # transcript-generator
-│   └── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, generate-poem-view, generate-academic-infographic-view
+│   └── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, generate-poem-view, generate-academic-infographic-view, generate-new-view
 ├── ideas/NNNN-name/
 │   ├── README.md         # Idea summary, origin, open questions
 │   ├── assets/           # Structured entities (characters, settings, concepts)

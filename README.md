@@ -19,6 +19,7 @@ Voice interface recommended: [Wispr Flow](https://wisprflow.ai/) or similar.
 | `/generate-view` | Create production content (blog post, brief, essay, etc.) |
 | `/generate-poem-view` | Generate poetry using Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | Create academically rigorous infographic specifications |
+| `/generate-new-view` | Create a new specialized view generator (meta-command) |
 
 ## File Structure
 
