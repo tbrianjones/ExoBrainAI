@@ -1,6 +1,6 @@
 ---
 name: publish-quarto
-description: Publish a Quarto document to writing.tbryanjones.com. Copies to writing-site, renders, commits, and pushes.
+description: Publish a Quarto document to ideas.tbrianjones.com. Copies to writing-site, renders, commits, and pushes.
 allowed-tools: Read, Write, Glob, Bash
 ---
 
@@ -66,8 +66,7 @@ git push origin main
 Tell the user:
 - "Post published successfully"
 - "GitHub Actions will deploy it shortly (1-2 minutes)"
-- "URL will be: https://writing.tbryanjones.com/posts/YYYY-MM-DD-[slug]/"
-- Or if custom domain not yet configured: "https://tbrianjones.github.io/writing-site/posts/..."
+- "URL will be: https://ideas.tbrianjones.com/posts/YYYY-MM-DD-[slug]/"
 
 ## Handling Data Files
 
