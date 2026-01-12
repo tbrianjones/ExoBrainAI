@@ -19,8 +19,7 @@ Filesystem is the database. Git versions content.
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
 | `/generate-new-view-command` | User wants to create a new specialized view generator |
-| `/generate-quarto-post` | Convert an existing view to Quarto format for publishing |
-| `/publish-quarto` | User wants to deploy a Quarto view to ideas.tbrianjones.com |
+| `/publish-quarto` | User wants to publish a view to ideas.tbrianjones.com |
 
 ## Agents
 
