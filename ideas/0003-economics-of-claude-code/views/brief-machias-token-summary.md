@@ -40,17 +40,17 @@ Yes, 2.2 billion tokens. But here's the thing: every message you send in Claude 
 
 ### What That Would've Cost at API Rates
 
-Using Anthropic's published pricing (January 2025):
+Using Anthropic's published pricing (January 2026):
 
 | Model | Input | Output | Cache Read | Cache Write | **Total** |
 |-------|------:|-------:|-----------:|------------:|----------:|
-| Opus 4.5 | $14.26 | $194.17 | $2,037.66 | $2,293.29 | **$4,539.39** |
+| Opus 4.5 | $4.75 | $64.72 | $679.22 | $764.43 | **$1,513.12** |
 | Sonnet 4.5 | $0.60 | $62.27 | $205.43 | $190.52 | **$458.82** |
 | Opus 4.1 | $0.01 | $5.06 | $9.71 | $8.72 | **$23.50** |
-| Haiku 4.5 | $0.00 | $0.00 | $0.02 | $0.07 | **$0.09** |
-| **TOTAL** | **$14.87** | **$261.51** | **$2,252.82** | **$2,492.59** | **$5,021.80** |
+| Haiku 4.5 | $0.00 | $0.00 | $0.03 | $0.08 | **$0.11** |
+| **TOTAL** | **$5.36** | **$132.05** | **$894.39** | **$963.75** | **$1,995.55** |
 
-**I paid $200 (two months of the $100 Max plan). API equivalent: $5,021.80. That's a 25x value multiplier.**
+**I paid $200 (two months of the $100 Max plan). API equivalent: $1,995.55. That's a 10x value multiplier.**
 
 ### If You Maxed Out the Subscription
 
@@ -58,10 +58,10 @@ This is the wild part. Anthropic publishes weekly usage limits. If you used ever
 
 | Plan | Monthly Cost | Maxed API Equivalent | Value Multiplier |
 |------|-------------:|---------------------:|-----------------:|
-| Max 5x | $100 | ~$20,750 | **~208x** |
-| Max 20x | $200 | ~$33,500 | **~168x** |
+| Max 5x | $100 | ~$8,250 | **~83x** |
+| Max 20x | $200 | ~$13,300 | **~67x** |
 
-I'm apparently using about 12% of what the plan allows. Someone grinding harder than me is getting 200x value.
+I'm apparently using about 12% of what the plan allows. Someone grinding harder than me is getting 80x value.
 
 Anthropic is either losing money on power users, betting inference costs drop fast, or both. Either way: good deal.
 
