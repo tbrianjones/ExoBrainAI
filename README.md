@@ -86,7 +86,7 @@ claude_writer/
 └── .claude/
     ├── commands/    # User-invoked commands
     ├── agents/      # Autonomous subagents
-    └── skills/      # Utilities (gemini, title-generation, etc.)
+    └── skills/      # Utilities (gemini, title-generation, summary-generation, tag-generation)
 ```
 
 ---
