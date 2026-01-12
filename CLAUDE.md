@@ -19,8 +19,7 @@ Filesystem is the database. Git versions content.
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
 | `/generate-new-view-command` | User wants to create a new specialized view generator |
-| `/generate-quarto-post` | Convert an existing view to Quarto format for publishing |
-| `/publish-quarto` | User wants to deploy a Quarto view to ideas.tbrianjones.com |
+| `/publish-quarto` | Publish a view to ideas.tbrianjones.com (converts to Quarto, saves to site/posts/, marks source as published) |
 
 ## Agents
 
@@ -33,6 +32,7 @@ Filesystem is the database. Git versions content.
 | Skill | Purpose |
 |-------|---------|
 | `gemini` | Generate images (saved to idea views/) or text (returned to caller) via Google Gemini API |
+| `title-generation` | Generate effective titles and headlines for any content type; invoked by view generators |
 
 ## Folder Structure
 
@@ -47,10 +47,14 @@ Filesystem is the database. Git versions content.
 │   ├── assets/           # Structured entities (characters, settings, concepts)
 │   ├── transcripts/      # Raw ideation captures
 │   └── views/            # Production content
+├── site/                 # Quarto site for ideas.tbrianjones.com
+│   ├── _quarto.yml       # Site config
+│   └── posts/            # Published posts
 └── templates/
     ├── voices/             # Writing voice/style references
     ├── poetry/             # Poetry generation frameworks
     ├── infographics/       # Infographic generation frameworks
+    ├── title-generation/   # Title and headline generation framework
     ├── quarto/             # Quarto post framework and reference
     └── command-generation/ # Meta-command frameworks
 ```

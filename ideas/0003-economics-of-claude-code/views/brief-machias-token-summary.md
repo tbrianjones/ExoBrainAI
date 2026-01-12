@@ -4,6 +4,7 @@ subtitle: Two months of Claude Code usage and what it would've cost me at API ra
 brief: A quick breakdown of my Claude Code token consumption, the equivalent API costs, and the absurd value multiplier if you actually max out a subscription.
 type: brief
 status: draft
+published: true
 audience: Machias (friend, fellow dev)
 voice: Buddy at a bar sharing something wild he discovered
 style:

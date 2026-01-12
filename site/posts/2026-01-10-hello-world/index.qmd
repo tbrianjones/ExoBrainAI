@@ -1,0 +1,54 @@
+---
+title: "Hello World"
+description: "A first post to test the publishing workflow"
+author: "T. Brian Jones"
+date: "2026-01-10"
+categories: [meta]
+---
+
+This is my first post on the new writing site. Let me demonstrate some of what's possible.
+
+## Code
+
+Here's some Python code:
+
+```python
+def hello():
+    return "Hello, world!"
+```
+
+## Interactive Elements
+
+Quarto supports Observable JavaScript for interactive visualizations:
+
+```{ojs}
+//| echo: false
+viewof count = Inputs.range([1, 100], {value: 50, step: 1, label: "Count"})
+```
+
+The count is **${count}**.
+
+```{ojs}
+//| echo: false
+Plot.plot({
+  marks: [
+    Plot.dot(Array.from({length: count}, (_, i) => ({
+      x: Math.cos(i * 0.1) * (i + 1),
+      y: Math.sin(i * 0.1) * (i + 1)
+    })), {x: "x", y: "y", fill: "steelblue"})
+  ],
+  width: 500,
+  height: 400
+})
+```
+
+## What's Next
+
+This site will host:
+
+- Articles and essays
+- Interactive data explorations
+- Code tutorials and experiments
+- Small applications and tools
+
+All generated from my local writing system and deployed automatically.

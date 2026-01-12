@@ -30,3 +30,7 @@ venv/
 
 # Logs
 *.log
+
+# Quarto
+site/_site/
+site/.quarto/

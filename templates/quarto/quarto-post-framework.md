@@ -318,19 +318,10 @@ When writing Quarto posts for this system:
 
 ## File Organization
 
-```
-ideas/0001-example/views/
-├── quarto-my-analysis.qmd
-├── data.csv
-├── supplementary.json
-└── images/
-    └── diagram.png
-```
-
-When publishing, all files in this folder structure are copied to:
+Views are created as `.md` files in idea spaces. When published via `/publish-quarto`, they are converted to Quarto format and saved directly to `site/posts/`:
 
 ```
-writing-site/posts/YYYY-MM-DD-my-analysis/
+site/posts/YYYY-MM-DD-my-analysis/
 ├── index.qmd
 ├── data.csv
 ├── supplementary.json
@@ -338,10 +329,12 @@ writing-site/posts/YYYY-MM-DD-my-analysis/
     └── diagram.png
 ```
 
+Data files from the view's directory are copied alongside the post.
+
 ## Local Preview
 
 ```bash
-cd ~/projects/writing-site
+cd site
 quarto preview
 ```
 

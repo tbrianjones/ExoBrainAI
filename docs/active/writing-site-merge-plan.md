@@ -4,10 +4,10 @@
 
 The `writing-site` repository was created as a separate repo to host the Quarto-based static site at ideas.tbrianjones.com. After implementation, it became clear that this repo is extremely simple (~150 lines of config) and the separation creates overhead without clear benefit.
 
-**Current State:**
+**Original State:**
 - `~/projects/claude_writer/` ; Main project with commands, ideas, and all tooling
 - `~/projects/writing-site/` ; Quarto site config, GitHub Actions workflow, and posts
-- Two commands bridge them: `/generate-quarto-post` (converts views) and `/publish-quarto` (copies and pushes)
+- Two commands bridged them: `/generate-quarto-post` (converts views) and `/publish-quarto` (copies and pushes)
 
 **The Question:** Should writing-site remain separate, or be merged into claude_writer?
 
@@ -229,8 +229,20 @@ Two options:
 | Workflow triggers too often | `paths` filter limits to site changes |
 | Loss of writing-site history | It's minimal; can keep repo archived |
 
-## Decision
+## Status
 
-Proceed with merge? This plan can be implemented in one session.
+**IMPLEMENTED** (2026-01-12)
 
-**To implement:** Create feature branch, execute phases 1-4, merge to main, then phase 5.
+Code changes complete:
+- [x] Site content copied to `site/`
+- [x] GitHub Actions workflow created at `.github/workflows/publish-site.yml`
+- [x] Commands consolidated: `/generate-quarto-post` merged into `/publish-quarto`
+- [x] `/publish-quarto` now: converts view → saves to site/posts/ → marks source as `published: true`
+- [x] Documentation updated (CLAUDE.md, README.md, templates)
+- [x] Orphaned .qmd files removed from views/
+
+Remaining manual steps:
+- [ ] Enable GitHub Pages on claude_writer repo (Settings > Pages > Source: GitHub Actions)
+- [ ] Configure custom domain (ideas.tbrianjones.com)
+- [ ] Verify deployment works
+- [ ] Archive writing-site repo

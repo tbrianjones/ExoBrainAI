@@ -1,69 +1,10 @@
 ---
-title: What Economics Actually Knows About Trade Policy
-subtitle: A journey from podcast curiosity to epistemic humility; and the five patterns history won't let us ignore
-brief: Triggered by Commerce Secretary Howard Lutnick's confident claims about steel subsidies, I went looking for a framework to evaluate trade policy arguments. What I found was uncomfortable: economics can't predict much. But 150 years of trade history offers something better than prediction; patterns that recur regardless of era, ideology, or circumstance.
-type: blog-post
-status: draft
-published: true
-audience: Curious generalists; people who want to think clearly about trade policy without being economists
-voice: Curious skeptic; first-person perspective of someone reasoning through unfamiliar territory, honest about uncertainty, showing the work
-style:
-  formality: 35
-  technical: 55
-  warmth: 45
-  humor: 20
-  provocative: 40
-sources:
-  - title: Howard Lutnick on All-In Podcast (January 9, 2026)
-    url: https://singjupost.com/transcript-of-howard-lutnicks-interview-on-all-in-podcast/
-    local_reference: ../transcripts/2026-01-09-lutnick-all-in-podcast-reference.md
+title: "What Economics Actually Knows About Trade Policy"
+description: "A journey from podcast curiosity to epistemic humility; and the five patterns history won't let us ignore"
+author: "T. Brian Jones"
+date: "2026-01-12"
+categories: [trade-policy, economics, epistemic-humility, tariffs, industrial-policy]
 ---
-
-## Outline
-
-- **I. The Trigger**
-  - Listening to All-In podcast; Lutnick on steel subsidies
-  - The claim: Japan/Korea at $400/ton (subsidized) vs. US at $700/ton
-  - China at $250/ton with free government power
-  - Not fact-checking; looking for a framework
-  - "How do I even think about whether this matters?"
-
-- **II. The Gift and Its Complications**
-  - Basic trade-off: winners (consumers, downstream industries) and losers (producers, workers)
-  - The "gift" argument: if foreign taxpayers subsidize our consumption, take the gift?
-  - Complications: strategic dependency, industry clusters, reciprocity
-  - Realizing competing frameworks don't resolve anything
-
-- **III. Is Economics Just Tail-Chasing?**
-  - The uncomfortable question: is any of this knowable?
-  - Economics vs. weather: weather doesn't change because you predicted rain
-  - Reflexivity: economic predictions alter outcomes
-  - No control groups; everything moves at once
-  - Near-despair: "motivated reasoning wrapped in economic language"
-
-- **IV. What Can We Actually Know?**
-  - Accounting identities: constraints on what's possible
-  - Historical base rates: not predictions, but priors
-  - The realization: 150 years of trade policy IS experimental data
-  - Shift: from "what will happen?" to "what has consistently happened?"
-
-- **V. Five Things History Actually Tells Us**
-  - Methodology note: patterns that recur across eras and ideologies
-  - Finding 1: Tariff retaliation is near-certain and mutually harmful
-  - Finding 2: Trade imbalances are macroeconomic, not trade policy problems
-  - Finding 3: Industrial policy works only with export discipline
-  - Finding 4: Downstream industries pay upstream protection costs
-  - Finding 5: Sanctions succeed 34% of the time; modest goals only
-
-- **VI. What This Means**
-  - Not nihilism: patterns offer actionable guidance
-  - Epistemic humility about forecasting; confidence in base rates
-  - A checklist for evaluating trade policy claims
-  - How to listen to Lutnick (or anyone) now
-
----
-
-## Content
 
 ### I. The Trigger
 
@@ -192,13 +133,3 @@ These aren't guarantees. Any specific situation could be the exception. But the 
 Lutnick's steel argument has force. The strategic dependency concern is real. But history suggests the response matters as much as the diagnosis. Tariffs invite retaliation. Protection without discipline breeds inefficiency. The downstream costs are real even if invisible.
 
 I still don't know what the "right" trade policy is. I'm not sure anyone does, or can. But I've learned to be skeptical of confident predictions; and to pay attention to historical patterns even when the confident people ignore them.
-
----
-
-## Tags
-
-trade policy, economics, epistemic humility, tariffs, howard lutnick, historical analysis, smoot-hawley, industrial policy, sanctions, steel industry
-
-## Hashtags
-
-#TradePolicy, #Economics, #EpistemicHumility, #Tariffs, #IndustrialPolicy, #HistoricalAnalysis, #SteelIndustry, #GlobalTrade, #PolicyAnalysis, #AllInPodcast

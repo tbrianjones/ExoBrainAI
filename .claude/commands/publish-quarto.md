@@ -1,116 +1,130 @@
 ---
 name: publish-quarto
-description: Publish a Quarto document to ideas.tbrianjones.com. Copies to writing-site, renders, commits, and pushes.
-allowed-tools: Read, Write, Glob, Bash
+description: Publish a view to ideas.tbrianjones.com. Converts to Quarto, saves to site/posts/, marks source as published, commits, pushes.
+allowed-tools: Read, Write, Glob, Bash, Edit
 ---
 
 # Publish Quarto
 
-Publish a Quarto document from an idea space to the writing site. Handles the full workflow: copy, render, commit, push.
-
-## Prerequisites
-
-- The writing-site repo must exist at `~/projects/writing-site`
-- The writing-site repo must be connected to GitHub
-- (Optional) Quarto installed locally for preview (`brew install quarto`)
+Publish a view from an idea space to ideas.tbrianjones.com. Handles the complete workflow: convert view to Quarto format, save to `site/posts/`, mark the source view as published, commit, and push.
 
 ## Process
 
-### 1. Identify the document to publish
+### 1. Select the view to publish
 
-If arguments provided, use them. Otherwise:
+If a path is provided as an argument, use it. Otherwise:
 
-1. Ask: "Which idea space contains the document?"
-2. List available `.qmd` files in that idea's `views/` folder
+1. Ask: "Which idea space contains the view?"
+2. List available `.md` files in that idea's `views/` folder
 3. Ask which one to publish
 
-### 2. Determine the post slug
+### 2. Preview the conversion
 
-- Default: derive from filename (e.g., `quarto-memory-palace.qmd` → `memory-palace`)
-- Ask if user wants a different slug
-- Final folder will be: `posts/YYYY-MM-DD-[slug]/`
+Read the view file, parse frontmatter and content, then show a preview:
 
-### 3. Copy files to writing-site
+```
+## Preview of Quarto Post
 
-```bash
-# Create the post directory
-mkdir -p ~/projects/writing-site/posts/YYYY-MM-DD-[slug]
+**Title:** [title from frontmatter]
+**Description:** [subtitle or brief from frontmatter]
+**Author:** T. Brian Jones
+**Date:** [today's date]
+**Categories:** [3-5 categories derived from tags]
 
-# Copy the .qmd file as index.qmd
-cp [source-path]/quarto-[title].qmd ~/projects/writing-site/posts/YYYY-MM-DD-[slug]/index.qmd
+---
 
-# Copy any associated data files (same directory as .qmd)
-# Look for: .csv, .json, .parquet, images/, data/
+**Content:**
+
+[Show the Content section that will be published]
 ```
 
-### 4. (Optional) Preview locally
+Ask: "Is there anything you'd like to add or change before publishing?"
 
-If Quarto is installed, you can preview before pushing:
-```bash
-cd ~/projects/writing-site
-quarto preview
+Wait for response. If changes requested, incorporate them and show updated preview.
+
+### 3. Determine the slug
+
+- Default: derive from filename (e.g., `brief-machias-token-summary.md` → `machias-token-summary`)
+- Ask: "Use slug '[default]' or enter a different one?"
+- Final folder will be: `site/posts/YYYY-MM-DD-[slug]/`
+
+### 4. Convert and save to site/posts/
+
+Transform the view to Quarto format and save directly to the site.
+
+**Frontmatter mapping:**
+- `title` → `title` (keep as-is)
+- `subtitle` or `brief` → `description`
+- Add `author: "T. Brian Jones"`
+- Add `date: "YYYY-MM-DD"` (today)
+- `tags` → `categories` (pick 3-5 most relevant, lowercase, hyphenated)
+
+**Content extraction:**
+- Extract only the `## Content` section
+- Drop `## Outline`, `## Tags`, `## Hashtags` sections
+- Keep all markdown formatting, tables, code blocks
+
+**Save location:**
+- `site/posts/YYYY-MM-DD-[slug]/index.qmd`
+
+**Copy associated data files** from the view's directory:
+- `*.csv`, `*.json`, `*.parquet`, `*.xlsx`
+- `images/`, `data/`
+- `*.js`, `*.png`, `*.jpg`, `*.gif`, `*.svg`
+
+### 5. Mark source view as published
+
+Add `published: true` to the source view's YAML frontmatter:
+
+```yaml
+---
+title: "Original Title"
+published: true
+# ... rest of frontmatter
+---
 ```
-Opens at localhost:4321 with live reload.
 
-### 5. Commit and push
+Use the Edit tool to add this field if not present, or update it if already present.
+
+### 6. Commit and push
 
 ```bash
-cd ~/projects/writing-site
-git add posts/YYYY-MM-DD-[slug]/
-git commit -m "Add post: [title]"
+git add site/posts/YYYY-MM-DD-[slug]/
+git add [source-view-path]
+git commit -m "Publish: [title]"
 git push origin main
 ```
 
-### 6. Report success
+### 7. Report success
 
 Tell the user:
-- "Post published successfully"
-- "GitHub Actions will deploy it shortly (1-2 minutes)"
-- "URL will be: https://ideas.tbrianjones.com/posts/YYYY-MM-DD-[slug]/"
+- "Published successfully!"
+- "Source view marked as published: [path]"
+- "GitHub Actions will deploy in 1-2 minutes"
+- "URL: https://ideas.tbrianjones.com/posts/YYYY-MM-DD-[slug]/"
 
-## Handling Data Files
+## Quarto Output Format
 
-When copying, check for associated files in the same directory as the `.qmd`:
+```qmd
+---
+title: "[title]"
+description: "[subtitle or brief]"
+author: "T. Brian Jones"
+date: "YYYY-MM-DD"
+categories: [category1, category2, category3]
+---
 
-```bash
-# Files to look for and copy:
-*.csv
-*.json
-*.parquet
-*.xlsx
-images/
-data/
-*.js (for embedded apps)
-*.png, *.jpg, *.gif, *.svg
+[Content section from original view]
 ```
-
-Copy all of these to the post directory.
 
 ## Handling Updates
 
-If the post directory already exists:
+If the post directory already exists in site/posts/:
 1. Ask: "This post already exists. Overwrite?"
 2. If yes, replace `index.qmd` and any updated data files
-3. Use a commit message like "Update post: [title]"
+3. Use commit message: "Update: [title]"
 
 ## Error Handling
-
-### Quarto not installed
-```
-Error: Quarto is not installed. Run `brew install quarto` to install it.
-```
-
-### Writing-site repo not found
-```
-Error: writing-site repo not found at ~/projects/writing-site
-Please clone or create it first.
-```
-
-### Render failure
-```
-Error: Quarto render failed. Please fix the following errors before publishing:
-[error output]
-```
 
 ### Git push failure
 ```
@@ -122,42 +136,22 @@ Error: Could not push to GitHub. Please check:
 
 ## Arguments
 
-The command can accept arguments:
-
 ```
-/publish-quarto ideas/0001-example/views/quarto-my-post.qmd
+/publish-quarto ideas/0003-economics-of-claude-code/views/brief-machias-token-summary.md
 ```
 
-Or:
+Or with custom slug:
 
 ```
-/publish-quarto --slug custom-slug ideas/0001-example/views/quarto-my-post.qmd
+/publish-quarto --slug custom-slug ideas/0003-economics-of-claude-code/views/brief-token-summary.md
 ```
 
-## Quick Reference
+## Example
 
-Full workflow in one go:
+**Input:** `ideas/0003-economics-of-claude-code/views/brief-machias-token-summary.md`
 
-```bash
-# 1. Create post directory
-mkdir -p ~/projects/writing-site/posts/2026-01-10-my-post
+**Creates:** `site/posts/2026-01-12-machias-token-summary/index.qmd`
 
-# 2. Copy files
-cp ideas/0001-example/views/quarto-my-post.qmd ~/projects/writing-site/posts/2026-01-10-my-post/index.qmd
+**Updates source:** Adds `published: true` to the view's frontmatter
 
-# 3. Render to verify
-cd ~/projects/writing-site && quarto render posts/2026-01-10-my-post/index.qmd
-
-# 4. Commit and push
-git add posts/2026-01-10-my-post/ && git commit -m "Add post: My Post" && git push origin main
-```
-
-## After Publishing
-
-The GitHub Actions workflow will:
-1. Check out the repo
-2. Install Quarto
-3. Run `quarto render` on the entire site
-4. Deploy to GitHub Pages
-
-This typically takes 1-2 minutes. The user can check progress in the Actions tab on GitHub.
+**URL:** `https://ideas.tbrianjones.com/posts/2026-01-12-machias-token-summary/`

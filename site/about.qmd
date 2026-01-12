@@ -1,0 +1,7 @@
+---
+title: "About"
+---
+
+I'm Brian. I write about technology, ideas, and the intersections between them.
+
+This site is built with [Quarto](https://quarto.org/) and hosted on GitHub Pages.

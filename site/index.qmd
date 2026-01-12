@@ -1,0 +1,11 @@
+---
+title: "T. Brian Jones"
+listing:
+  contents: posts
+  sort: "date desc"
+  type: default
+---
+
+Welcome to my writing space. Here you'll find articles, explorations, and interactive experiments.
+
+## Recent Posts
