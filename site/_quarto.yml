@@ -11,6 +11,7 @@ website:
   title: "T. Brian Jones"
   description: "Writing, code, and interactive explorations"
   navbar:
+    background: primary
     left:
       - href: index.qmd
         text: Home
@@ -24,7 +25,7 @@ website:
 
 format:
   html:
-    theme: cosmo
+    theme: sandstone
     css: styles.css
     toc: true
     code-fold: true
