@@ -1,0 +1,9 @@
+/*-- scss:defaults --*/
+
+// Match current Bootswatch Sandstone demo typography
+// (The npm package uses Roboto, but the demo uses Source Sans Pro)
+
+$web-font-path: "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" !default;
+@import url("#{$web-font-path}");
+
+$font-family-sans-serif: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol" !default;
