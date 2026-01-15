@@ -28,11 +28,18 @@ The human's ideas and the combined realizations of human and AI are the treasure
 
 ## What to Ignore
 
-- Technical implementation details
-- Tool calls and their outputs
-- File operations and code changes
-- Action items and next steps
-- Troubleshooting and debugging exchanges
+These are NOT part of ideation and should be stripped from transcripts:
+
+- **Tool calls and outputs**: Bash commands, file reads, grep searches, glob patterns, web fetches, and their results
+- **File operations**: "I'm reading the file", "I'm writing to", "Let me edit", file paths, code snippets
+- **Administrative dialogue**: Permission requests, "Would you like me to...", "Should I proceed?", confirmation exchanges
+- **System messages**: Reminders, token warnings, budget notifications, anything in system tags
+- **Tactical implementation**: "Let me use the Read tool", "I'll search for", "Running git status", step-by-step procedural narration
+- **Debugging exchanges**: Error messages, stack traces, "that didn't work, let me try...", troubleshooting back-and-forth
+- **Action planning**: "Next I'll...", "First we need to...", task breakdowns, todo lists
+- **Meta-conversation about the tools**: Discussions about Claude Code features, how commands work, technical limitations
+
+**Keep only**: Questions about ideas, responses exploring ideas, conceptual proposals, reasoning about concepts, emotional reactions to ideas, realizations and insights, human's thinking-out-loud about the topic.
 
 ## Process
 
@@ -43,6 +50,8 @@ The human's ideas and the combined realizations of human and AI are the treasure
    - Person: The human's name (e.g., T. Brian Jones)
    - AI: Brand, model, version (e.g., Claude Opus 4.5)
    - Emotional analysis: Tags and/or sentence describing the emotional tenor
+   - Source thread: The Claude Code thread ID
+   - Raw transcript: Path to the jsonl file (`~/.claude/conversations/[thread-id].jsonl`)
 
 3. **Build Ideas & Themes**:
    - Extract major themes, concepts, key realizations, turning points
@@ -57,11 +66,19 @@ The human's ideas and the combined realizations of human and AI are the treasure
    - Limit to 15 topics maximum
 
 5. **Build the Full Transcript**:
-   - Capture the raw Q&A exchange
+   - **CRITICAL**: This section must be COMPREHENSIVE, not summarized
+   - Extract ONLY the ideation dialogue—strip out everything listed in "What to Ignore" above
    - Include the initial prompt that kicked off ideation
-   - Record exact questions asked and exact answers given
-   - Light cleanup acceptable (speech-to-text errors) but preserve voice
-   - This is the archival record—don't summarize here
+   - Record Claude's exact questions and idea proposals in full
+   - Record the human's exact answers in full
+   - Each exchange should be verbatim dialogue, not one-sentence summaries
+   - If a human gave a 3-paragraph response, include all 3 paragraphs
+   - If Claude asked a detailed multi-part question, include the complete question
+   - If Claude proposed ideas or frameworks, include the full proposal
+   - Light cleanup acceptable (speech-to-text errors, obvious typos) but preserve voice and length
+   - This is the archival record of the idea exchange—DO NOT summarize here
+   - The Full Transcript should be significantly longer than the Transcript Summary
+   - Each Q&A exchange should capture the actual dialogue, not "Claude asked about X. Human said Y."
 
 6. **Write the file** to the specified location
 
@@ -72,6 +89,8 @@ The human's ideas and the combined realizations of human and AI are the treasure
 - person: [name]
 - ai: [model]
 - emotional analysis: [tags and/or description]
+- source thread: [thread-id]
+- raw transcript: `~/.claude/conversations/[thread-id].jsonl`
 
 ## Ideas & Themes
 - **[Title]**: [Summary]
@@ -93,8 +112,8 @@ The human's ideas and the combined realizations of human and AI are the treasure
 ---
 
 ### Q1: [Topic]
-**Claude:** [Exact question]
-**[Person]:** [Exact answer]
+**Claude:** [Complete exact question or idea proposal—multiple paragraphs if needed]
+**[Person]:** [Complete exact answer—multiple paragraphs if needed]
 
 ---
 
