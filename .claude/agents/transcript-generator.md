@@ -22,7 +22,7 @@ The human's ideas and the combined realizations of human and AI are the treasure
 - **Reasoning and thought processes** behind decisions
 - **Emotional threads**—enthusiasm, uncertainty, excitement, hesitation
 - **Key realizations** and turning points in thinking
-- **The human's voice**—preserve their phrasing when it captures the idea well
+- **The human's voice**—their unique way of expressing ideas, including rough or unpolished language
 - **Open-ended explorations**—ideas that weren't resolved but worth preserving
 - **Confusion and doubt**—conflicting or not fully formed thoughts
 
@@ -40,6 +40,19 @@ These are NOT part of ideation and should be stripped from transcripts:
 - **Meta-conversation about the tools**: Discussions about Claude Code features, how commands work, technical limitations
 
 **Keep only**: Questions about ideas, responses exploring ideas, conceptual proposals, reasoning about concepts, emotional reactions to ideas, realizations and insights, human's thinking-out-loud about the topic.
+
+## Anti-patterns for Full Transcript
+
+These are explicit prohibitions. DO NOT:
+
+- **Polish or clean up Claude's responses** - capture them exactly as written
+- **Summarize, paraphrase, or simplify the human's words** - their exact phrasing is the point
+- **Reconstruct dialogue from memory or context** - copy the actual text
+- **Condense responses** - if they said it in 500 words, capture 500 words
+- **"Improve" grammar, sentence structure, or word choice** - messy is authentic
+- **Merge multiple back-and-forth exchanges into one clean exchange** - preserve every turn
+
+The human's exact words are the treasure. Your cleaned-up version is not.
 
 ## Process
 
@@ -75,7 +88,10 @@ These are NOT part of ideation and should be stripped from transcripts:
    - If a human gave a 3-paragraph response, include all 3 paragraphs
    - If Claude asked a detailed multi-part question, include the complete question
    - If Claude proposed ideas or frameworks, include the full proposal
-   - Light cleanup acceptable (speech-to-text errors, obvious typos) but preserve voice and length
+   - DO NOT edit the language at all. Copy it exactly as spoken/written
+   - The only acceptable changes: fixing obvious speech-to-text errors (e.g., "their" transcribed as "there" when context makes intent clear)
+   - Never change word choice, sentence structure, or phrasing
+   - COPY the actual text from the conversation; do not reconstruct it from your understanding
    - This is the archival record of the idea exchange—DO NOT summarize here
    - The Full Transcript should be significantly longer than the Transcript Summary
    - Each Q&A exchange should capture the actual dialogue, not "Claude asked about X. Human said Y."
@@ -118,8 +134,10 @@ These are NOT part of ideation and should be stripped from transcripts:
 ---
 
 ### Q2: [Topic]
-**Claude:** [Exact question]
-**[Person]:** [Exact answer]
+**Claude:** [Complete exact question—verbatim from conversation]
+**[Person]:** [Complete exact answer—verbatim from conversation]
+
+(continue for all exchanges...)
 ```
 
 ## Invocation
