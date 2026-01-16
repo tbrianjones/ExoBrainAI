@@ -25,7 +25,8 @@ Filesystem is the database. Git versions content.
 
 | Agent | Invocation |
 |-------|------------|
-| `transcript-generator` | Called by `/generate-transcript` or spun up directly in a thread after `/ideate` to capture conversation |
+| `transcript-summary-generator` | Called by `/generate-transcript`; produces synthesized Ideas & Themes and Transcript Summary |
+| `transcript-raw-generator` | Called by `/generate-transcript`; produces verbatim Full Transcript with zero editing |
 
 ## Skills
 
@@ -40,7 +41,7 @@ Filesystem is the database. Git versions content.
 
 ```
 ├── .claude/
-│   ├── agents/           # transcript-generator
+│   ├── agents/           # transcript-summary-generator, transcript-raw-generator
 │   ├── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, etc.
 │   └── skills/           # gemini, title-generation, summary-generation, tag-generation
 ├── scripts/              # Python utilities (gemini.py)
