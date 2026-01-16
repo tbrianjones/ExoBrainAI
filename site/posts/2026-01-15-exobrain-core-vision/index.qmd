@@ -1,6 +1,7 @@
 ---
 title: "ExoBrain: The Thing Everyone Is Building Without Knowing It"
 subtitle: A technical concept for the next evolution of personal computing
+published: true
 description: Every AI startup is building the same infrastructure in different verticals. ExoBrain is what happens when you build that infrastructure once and let everything else plug in on top. It's locally-controlled idea spaces, progressive context discovery, and the death of applications as we know them.
 date: 2026-01-15
 author: T. Brian Jones
@@ -11,7 +12,7 @@ categories: [ai, computing, ideas]
 
 I keep running into the same thing everywhere. Every AI startup, every enterprise implementation, every tool trying to make AI useful for some specific workflow; they're all building identical infrastructure. Aggregate knowledge, centralize it securely, give AI access to search and synthesize, create interfaces for humans and other systems.
 
-Sales automation? That. Grocery shopping apps? That. Meeting transcription? Development workflows? That. It's all the same shit happening over and over again, just applied to different verticals. This isn't coincidence. We're discovering a new computing paradigm.
+Sales automation? That. Grocery shopping apps? That. Meeting transcription? Development workflows? That. It's all the same structures happening over and over again, just applied to different verticals. This isn't coincidence. We're discovering a new computing paradigm.
 
 ### The Human API
 
