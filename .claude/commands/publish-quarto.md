@@ -1,6 +1,6 @@
 ---
 name: publish-quarto
-description: Publish a view to ideas.tbrianjones.com. Converts to Quarto, saves to site/posts/, marks source as published, commits, pushes.
+description: Publish a view to ideas.tbrianjones.com. Converts to Quarto (.qmd), saves to site/posts/, marks source as published, commits, pushes.
 allowed-tools: Read, Write, Glob, Bash, Edit
 ---
 
