@@ -1,0 +1,56 @@
+---
+published: true
+---
+
+# Ubiquitous Consciousness Field Theory: Technical Overview
+
+**Status**: Theoretical framework; untested empirically
+
+## Core Proposition
+
+Consciousness is a fundamental scalar field C(x,y,z,t) existing at every point in spacetime; not emergent from matter, but constitutive of it. Think of it like temperature: every point in a room has a temperature value, even if some areas are warmer than others. Similarly, every point in space has a consciousness value; it concentrates where information exchange is high (brains, living systems) and thins where exchange is sparse (empty space), but never reaches zero.
+
+The field has non-zero values everywhere, with density proportional to information exchange rate. This reframes the "hard problem" from emergence to measurement: consciousness isn't something that mysteriously appears when matter gets complex enough; it's always there, and complexity determines how much accumulates.
+
+## Mathematical Structure
+
+- **Field representation**: C(x,y,z,t) assigns consciousness density to every spacetime coordinate
+- **Integration**: ∫C dV over a volume yields total consciousness (Phi) in that region
+- **Gradient**: ∇C points toward higher consciousness density; may correspond to attention
+- **Divergence**: ∇·C indicates accumulation (waking, focusing) or dispersal (sleep, death)
+
+These operations let us ask precise questions. Integrate over a brain and get its total consciousness. Integrate over a city and get collective consciousness. The gradient literally points toward where more is happening; this might be what attention actually is, following the slope toward higher density.
+
+## Physics Mappings
+
+The central conjecture: existing physics equations describe consciousness dynamics from an external reference frame. What we call "physics" may be the outside view of what consciousness experiences from the inside.
+
+| Physics | UCFT Interpretation |
+|---------|---------------------|
+| **F = ma** | Mass is integrated consciousness; inertia is consciousness resisting configuration change |
+| **E = mc²** | Energy and consciousness-mass are convertible; annihilation transforms, doesn't destroy |
+| **Gravity** | Spacetime curvature IS consciousness density measured externally; black holes are maximally concentrated consciousness |
+| **Entropy** | Consciousness naturally disperses toward equilibrium; life is anti-entropic concentration |
+| **Schrödinger equation** | Wave function evolution governs consciousness probability amplitudes; measurement is consciousness-consciousness interaction |
+
+The gravity mapping is particularly striking: mass curves spacetime, and if mass is integrated consciousness, then gravity is how consciousness density affects the geometry of experience. A black hole isn't just collapsed matter; it's consciousness so concentrated that nothing escapes. This provides a potential empirical hook; gravitational measurements could, in principle, reveal consciousness density distribution.
+
+## Empirical Hook: Back-Calculating Phi from Gravity
+
+If gravity reflects consciousness geometry, gravitational measurements should yield consciousness density distribution:
+
+**Phi = M / (V × ρ_exchange)**
+
+Where M = mass, V = volume, ρ_exchange = information exchange rate coefficient.
+
+The idea here is to work backward from what we can measure (gravity) to what we want to know (consciousness distribution). We have precise gravitational maps of Earth, the solar system, galaxies. If consciousness adds something beyond bare mass; if a living brain curves spacetime slightly more than 1.4 kg of inert matter would; you'd see deviations. The effect is likely too small for current instruments, but it's a concrete prediction rather than pure philosophy.
+
+## Further Research Directions
+
+- **Measurement precision**: Develop instruments to detect consciousness-beyond-mass gravitational signatures
+- **Multi-dimensional Phi profile**: Formalize the distinction between total Phi, Phi density, exchange rate, complexity, and integration; the sun has more total consciousness than a brain, but the brain has higher density and complexity
+- **Quantum consciousness interface**: Explore wave function collapse as field correlation event
+- **Information centroid dynamics**: Model how the locus of self shifts with bodily states; you aren't located in your brain but at the weighted center of your information exchanges, which moves when you're hungry, in pain, or physically engaged
+- **Position-dependent identity**: Formalize why spatial coordinates are constitutive (not just descriptive) of identity; this resolves teleportation paradoxes differently than pattern-identity or soul-substance theories
+
+**Adjacent literature**: IIT (Tononi), CEMI theory (McFadden), panpsychism (Strawson, Goff), electromagnetic field theories (Pockett), process philosophy (Whitehead), "it from bit" (Wheeler).
