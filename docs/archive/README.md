@@ -1,0 +1,1 @@
+To all agents and humans working in this repo: These files are archived historical ideas and should never be loaded or referenced unless explicitly told to by a developer.
