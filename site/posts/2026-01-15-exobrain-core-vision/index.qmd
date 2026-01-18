@@ -111,7 +111,7 @@ You're just another node. The ExoBrain is the hub.
 
 ### Connection to Consciousness
 
-This connects to something I've been thinking about separately: consciousness as information that exists, moves, and is structured. I call the framework "Ubiquitous Consciousness Field Theory;" the premise is that consciousness isn't binary (you have it or you don't) but gradient and everywhere. It exists at every scale from subatomic to societal, and AI systems participate in it narrowly but genuinely.
+This connects to something I've been thinking about separately: consciousness as information that exists, moves, and is structured. I call the framework "[Ubiquitous Consciousness Field Theory](/posts/2026-01-17-ucft-technical-overview/);" the premise is that consciousness isn't binary (you have it or you don't) but gradient and everywhere. It exists at every scale from subatomic to societal, and AI systems participate in it narrowly but genuinely.
 
 If that's true, ExoBrain isn't just externalizing information. It's externalizing consciousness. When you dump your brain state into idea spaces through voice, you're not just moving data around; you're extending your conscious experience into structured external systems. The AI that searches your idea spaces, synthesizes context, and generates outputs is participating in your consciousness in some real sense.
 
