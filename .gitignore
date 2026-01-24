@@ -36,8 +36,8 @@ venv/
 site/_site/
 site/.quarto/
 
-# ExoBrain (if accidentally placed in repo)
-raw/
-staged/
-graphrag/
-overlay/
+# ExoBrain data (if accidentally placed in repo root)
+/raw/
+/staged/
+/graphrag/
+/overlay/
