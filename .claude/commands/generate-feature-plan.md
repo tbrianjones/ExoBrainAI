@@ -1,7 +1,8 @@
 ---
-description: Generate a feature plan from the current conversation
+description: Captures product context, architectural decisions, and implementation details from conversation into a structured plan document. Use when user mentions create plan, feature plan, capture discussion, document feature, write up plan, implementation plan, or planning document. Produces docs/active/ plans with Agent Quick Start sections for AI handoff.
 argument-hint: [feature-name]
 allowed-tools: Read, Glob, Grep, Write, AskUserQuestion, Task
+permissionMode: acceptEdits
 ---
 
 # Generate Feature Plan
@@ -73,111 +74,25 @@ Don't generate with empty sections. Probe by category:
 
 ### 6. Generate Plan
 
-Write to `docs/active/{YYYYMMDD}-{topic-kebab-case}-plan-claude.md` using this template:
+Write to `docs/active/{YYYYMMDD}-{topic-kebab-case}-plan-claude.md` using this structure:
 
-```markdown
----
-status: Planning
-date: {YYYY-MM-DD}
-branch: {if applicable}
-related-adrs: [{list}]
----
+**Frontmatter:** `status: Planning`, `date`, `branch` (if applicable), `related-adrs`
 
-# {Feature Name} Plan
-
-## Summary
-{2-3 sentence executive summary - what it does and why it matters}
-
-## Agent Quick Start
-> Read this section first if you're an AI agent picking up this plan.
-
-**Load these files:**
-- {primary files to modify}
-- {related config or types}
-
-**Read these ADRs:**
-- ADR-0XX: {relevant decision}
-
-**Relevant skills:**
-- `{skill-name}` - {why relevant}
-
-**Explore these areas:**
-- `{directory/}` - {what's there}
-
-## Problem Statement
-- **User Persona:** {who experiences this problem}
-- **Pain Point:** {what problem they face}
-- **Current State:** {how they work around it now}
-- **Business Impact:** {why this matters}
-
-## Success Metrics
-| Metric | Baseline | Target | Measurement |
-|--------|----------|--------|-------------|
-| {metric} | {current} | {goal} | {how measured} |
-
-## Feature Overview
-{What the feature does - 2-3 sentences}
-
-### Core User Flow
-1. User does X
-2. System responds with Y
-3. User sees Z
-
-## Scope
-
-### In Scope
-- ...
-
-### Out of Scope (Do Not Build)
-- ...
-
-### Dependencies
-- ...
-
-## User Stories + Acceptance Criteria
-
-### Story 1: {Title}
-**As a** {persona}, **I want** {action} **so that** {benefit}
-
-**Acceptance Criteria:**
-- [ ] Given {setup}, when {action}, then {result}
-- [ ] Given {setup}, when {action}, then {result}
-
-## Key Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-
-### Decision 1: {Title}
-**Choice:** {what was decided}
-**Alternatives:** {what else was considered}
-**Rationale:** {why this choice}
-
-## Technical Approach
-{Architecture, code patterns, file paths, services affected}
-
-## Implementation Phases
-**Phase 1:** {description}
-**Phase 2:** {description}
-
-*If not discussed: "Implementation phases to be defined during planning."*
-
-## Open Questions
-| Question | Impact | Notes |
-|----------|--------|-------|
-
-## Future Considerations
-{Discussed but deferred items}
-
-## Verification
-- [ ] {test commands}
-- [ ] {manual verification steps}
-- [ ] {success criteria check}
-
-## References
-- Related plans: ...
-- Will generate ADR: ADR-0XX ({topic})
-```
+**Sections (in order):**
+1. **Summary** - 2-3 sentence executive summary
+2. **Agent Quick Start** - Files to load, ADRs to read, relevant skills, areas to explore
+3. **Problem Statement** - User persona, pain point, current state, business impact
+4. **Success Metrics** - Table: metric, baseline, target, measurement
+5. **Feature Overview** - What it does + core user flow (numbered steps)
+6. **Scope** - In scope, out of scope (do not build), dependencies
+7. **User Stories + Acceptance Criteria** - "As a..I want..so that" format with Given-When-Then criteria
+8. **Key Decisions** - Table + detail blocks: choice, alternatives, rationale
+9. **Technical Approach** - Architecture, code patterns, file paths, services
+10. **Implementation Phases** - Phase 1, Phase 2, etc. (or "to be defined")
+11. **Open Questions** - Table: question, impact, notes
+12. **Future Considerations** - Discussed but deferred items
+13. **Verification** - Test commands, manual checks, success criteria
+14. **References** - Related plans, ADR to generate
 
 ### 7. Verify Output
 
