@@ -1,0 +1,50 @@
+services:
+  exobrain:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    container_name: exobrain
+    ports:
+      - "${EXOBRAIN_API_PORT:-8420}:8420"
+    environment:
+      - EXOBRAIN_DATA_DIR=/data
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ${EXOBRAIN_DATA_DIR}:/data
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    command: ["python", "-m", "src.api.main"]
+
+  watcher:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    container_name: exobrain-watcher
+    environment:
+      - EXOBRAIN_DATA_DIR=/data
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ${EXOBRAIN_DATA_DIR}:/data
+    depends_on:
+      - exobrain
+    restart: unless-stopped
+    command: ["python", "-m", "src.watcher.main"]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: exobrain-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  ollama_models:

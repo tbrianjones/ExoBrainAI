@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exobrain"
+version = "2.0.0"
+description = "Local-first GraphRAG memory engine"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "TBJ"}
+]
+keywords = ["graphrag", "memory", "knowledge-graph", "rag"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "graphrag>=2.0.0",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "typer[all]>=0.9.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "watchdog>=3.0.0",
+    "python-dotenv>=1.0.0",
+    "uuid7>=0.1.0",
+    "httpx>=0.26.0",
+    "aiofiles>=23.2.0",
+    "pandas>=2.1.0",
+    "pyarrow>=14.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+exobrain = "src.cli.main:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
