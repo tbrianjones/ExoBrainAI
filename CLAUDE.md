@@ -32,6 +32,7 @@ Filesystem is the database. Git versions content.
 
 | Skill | Purpose |
 |-------|---------|
+| `exobrain` | Interface with ExoBrain memory engine for storage, annotation, and retrieval |
 | `title-generation` | Generate effective titles and headlines for any content type |
 | `summary-generation` | Generate summaries, abstracts, briefs, and meta descriptions |
 | `tag-generation` | Generate tags, hashtags, and topic classifications for any platform |
@@ -42,8 +43,10 @@ Filesystem is the database. Git versions content.
 ├── .claude/
 │   ├── agents/           # transcript-summary-generator, transcript-raw-generator
 │   ├── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, etc.
-│   └── skills/           # title-generation, summary-generation, tag-generation
-├── ideas/NNNN-name/
+│   └── skills/           # exobrain, title-generation, summary-generation, tag-generation
+├── engine/               # ExoBrain memory engine (Docker-based)
+│   └── src/              # Python source: core, graphrag, cli, api, watcher
+├── ideas/NNNN-name/      # Idea spaces (will migrate to ExoBrain)
 │   ├── README.md         # Idea summary, origin, open questions
 │   ├── assets/           # Structured entities (characters, settings, concepts)
 │   ├── transcripts/      # Raw ideation captures
@@ -61,6 +64,24 @@ Filesystem is the database. Git versions content.
     ├── quarto/             # Quarto post framework and reference
     └── command-generation/ # Meta-command frameworks
 ```
+
+## ExoBrain Memory Engine
+
+ExoBrain provides GraphRAG-powered memory with zero-friction capture:
+
+```bash
+# Start the engine
+docker compose up -d
+
+# Capture a thought
+echo "My idea..." | docker compose exec exobrain exobrain capture
+
+# Query your memory
+docker compose exec exobrain exobrain query "What do I know about X?"
+```
+
+Data lives outside the repo at `$EXOBRAIN_DATA_DIR` (configured in `.env`).
+See `.claude/skills/exobrain.md` for full CLI and API documentation.
 
 ## Working in Idea Spaces
 
