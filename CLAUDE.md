@@ -32,7 +32,6 @@ Filesystem is the database. Git versions content.
 
 | Skill | Purpose |
 |-------|---------|
-| `gemini` | Generate images (saved to idea views/) or text (returned to caller) via Google Gemini API |
 | `title-generation` | Generate effective titles and headlines for any content type |
 | `summary-generation` | Generate summaries, abstracts, briefs, and meta descriptions |
 | `tag-generation` | Generate tags, hashtags, and topic classifications for any platform |
@@ -43,8 +42,7 @@ Filesystem is the database. Git versions content.
 ├── .claude/
 │   ├── agents/           # transcript-summary-generator, transcript-raw-generator
 │   ├── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, etc.
-│   └── skills/           # gemini, title-generation, summary-generation, tag-generation
-├── scripts/              # Python utilities (gemini.py)
+│   └── skills/           # title-generation, summary-generation, tag-generation
 ├── ideas/NNNN-name/
 │   ├── README.md         # Idea summary, origin, open questions
 │   ├── assets/           # Structured entities (characters, settings, concepts)

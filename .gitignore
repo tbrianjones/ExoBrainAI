@@ -22,11 +22,12 @@ Thumbs.db
 # Node (if we add tooling later)
 node_modules/
 
-# Python (if we add tooling later)
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+*.egg-info/
 
 # Logs
 *.log
@@ -34,3 +35,9 @@ venv/
 # Quarto
 site/_site/
 site/.quarto/
+
+# ExoBrain (if accidentally placed in repo)
+raw/
+staged/
+graphrag/
+overlay/
