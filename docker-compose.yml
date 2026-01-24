@@ -17,6 +17,8 @@ services:
       - ${EXOBRAIN_DATA_DIR}:/data
       # Derived data (container-local): staged, graphrag, logs
       - exobrain_cache:/cache
+      # Legacy ideas folder (read-only, for migration)
+      - ./ideas:/ideas:ro
     depends_on:
       ollama:
         condition: service_healthy

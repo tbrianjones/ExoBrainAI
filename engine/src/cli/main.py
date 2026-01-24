@@ -271,6 +271,99 @@ def capture(
         typer.echo(f"Added title: {title}")
 
 
+@app.command()
+def annotate(
+    doc_id: str = typer.Argument(..., help="Document ID to annotate"),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="Set title"),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Set summary"),
+    tag: Optional[list[str]] = typer.Option(None, "--tag", help="Add tag (repeatable)"),
+    entity: Optional[list[str]] = typer.Option(None, "--entity", "-e", help="Add entity (repeatable)"),
+    link: Optional[list[str]] = typer.Option(
+        None, "--link", "-l", help="Link to another doc ID (repeatable)"
+    ),
+    link_note: Optional[str] = typer.Option(
+        None, "--link-note", help="Note for the link (use with single --link)"
+    ),
+    source: str = typer.Option("human", "--source", help="Source: human, ai, system"),
+):
+    """Add annotations to an existing document.
+
+    Examples:
+        # Add a title
+        exobrain annotate <doc-id> --title "My Document"
+
+        # Add tags
+        exobrain annotate <doc-id> --tag project-x --tag important
+
+        # Link two documents
+        exobrain annotate <doc-id> --link <other-doc-id> --link-note "Related discussion"
+
+        # Add multiple annotations at once
+        exobrain annotate <doc-id> --title "Notes" --tag meeting --entity "John Smith"
+    """
+    from src.core import (
+        EntityItem,
+        LinkItem,
+        OverlayRecord,
+        TagItem,
+        append_overlay,
+        raw_doc_exists,
+    )
+
+    # Verify document exists
+    if not raw_doc_exists(doc_id):
+        typer.echo(f"Error: Document not found: {doc_id}", err=True)
+        raise typer.Exit(1)
+
+    # Validate source
+    if source not in ("human", "ai", "system", "import"):
+        typer.echo(f"Error: Invalid source: {source}", err=True)
+        raise typer.Exit(1)
+
+    # Check if any annotations provided
+    if not any([title, summary, tag, entity, link]):
+        typer.echo("Error: No annotations provided. Use --title, --tag, --entity, --link, or --summary")
+        raise typer.Exit(1)
+
+    # Build overlay record
+    tags = [TagItem(tag=t) for t in (tag or [])]
+    entities = [EntityItem(name=e) for e in (entity or [])]
+    links = []
+    if link:
+        for i, l in enumerate(link):
+            note = link_note if (len(link) == 1 and link_note) else None
+            links.append(LinkItem(doc_id=l, note=note))
+
+    record = OverlayRecord(
+        doc_id=doc_id,
+        source=source,
+        title=title,
+        summary=summary,
+        tags=tags if tags else None,
+        entities=entities if entities else None,
+        links=links if links else None,
+    )
+
+    append_overlay(record)
+
+    # Report what was added
+    typer.echo(f"Annotated: {doc_id}")
+    if title:
+        typer.echo(f"  Title: {title}")
+    if summary:
+        typer.echo(f"  Summary: {summary[:50]}..." if len(summary) > 50 else f"  Summary: {summary}")
+    if tags:
+        typer.echo(f"  Tags: {', '.join(t.tag for t in tags)}")
+    if entities:
+        typer.echo(f"  Entities: {', '.join(e.name for e in entities)}")
+    if links:
+        for lnk in links:
+            if lnk.note:
+                typer.echo(f"  Link: {lnk.doc_id} ; {lnk.note}")
+            else:
+                typer.echo(f"  Link: {lnk.doc_id}")
+
+
 # Import and add migrate subcommand
 from src.cli.commands.migrate import migrate as migrate_cmd
 
@@ -293,7 +386,7 @@ def migrate(
         help="Only migrate transcript files",
     ),
     ideas_root: str = typer.Option(
-        "./ideas",
+        "/ideas",
         "--ideas-root",
         help="Root directory for ideas/ (for 'all' migration)",
     ),
