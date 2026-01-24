@@ -9,8 +9,15 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """ExoBrain settings loaded from environment."""
 
-    # Data directory (required)
+    # User info
+    user: str = "Unknown"
+    user_email: str = ""
+
+    # Data directory (canonical data: raw docs, overlays) - syncs via Dropbox
     data_dir: Path = Path(os.environ.get("EXOBRAIN_DATA_DIR", "/data"))
+
+    # Cache directory (derived data: staged, graphrag, logs) - container-local
+    cache_dir: Path = Path(os.environ.get("EXOBRAIN_CACHE_DIR", "/cache"))
 
     # API settings
     api_port: int = 8420
@@ -31,38 +38,46 @@ class Settings(BaseSettings):
         env_prefix = "EXOBRAIN_"
         env_file = ".env"
 
+    # === Canonical data (Dropbox-synced) ===
+
     @property
     def raw_dir(self) -> Path:
-        """Directory for raw documents."""
+        """Directory for raw documents (canonical)."""
         return self.data_dir / "raw"
 
     @property
     def overlay_dir(self) -> Path:
-        """Directory for overlay annotations."""
+        """Directory for overlay annotations (canonical)."""
         return self.data_dir / "overlay" / "annotations"
+
+    # === Derived data (container-local) ===
 
     @property
     def staged_dir(self) -> Path:
-        """Directory for staged documents."""
-        return self.data_dir / "staged"
+        """Directory for staged documents (derived, regenerable)."""
+        return self.cache_dir / "staged"
 
     @property
     def graphrag_dir(self) -> Path:
-        """Directory for GraphRAG artifacts."""
-        return self.data_dir / "graphrag"
+        """Directory for GraphRAG artifacts (derived, regenerable)."""
+        return self.cache_dir / "graphrag"
 
     @property
     def logs_dir(self) -> Path:
-        """Directory for logs."""
-        return self.data_dir / "logs"
+        """Directory for logs (ephemeral)."""
+        return self.cache_dir / "logs"
 
     def ensure_dirs(self) -> None:
         """Create all required directories if they don't exist."""
+        # Canonical directories
+        for d in [self.raw_dir, self.overlay_dir]:
+            d.mkdir(parents=True, exist_ok=True)
+
+        # Cache directories
         for d in [
-            self.raw_dir,
-            self.overlay_dir,
             self.staged_dir,
             self.graphrag_dir / "output",
+            self.graphrag_dir / "cache",
             self.logs_dir,
         ]:
             d.mkdir(parents=True, exist_ok=True)

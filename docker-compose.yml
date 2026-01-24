@@ -8,9 +8,15 @@ services:
       - "${EXOBRAIN_API_PORT:-8420}:8420"
     environment:
       - EXOBRAIN_DATA_DIR=/data
+      - EXOBRAIN_CACHE_DIR=/cache
+      - EXOBRAIN_USER=${EXOBRAIN_USER:-Unknown}
+      - EXOBRAIN_USER_EMAIL=${EXOBRAIN_USER_EMAIL:-}
       - OLLAMA_HOST=http://ollama:11434
     volumes:
+      # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
+      # Derived data (container-local): staged, graphrag, logs
+      - exobrain_cache:/cache
     depends_on:
       ollama:
         condition: service_healthy
@@ -24,9 +30,13 @@ services:
     container_name: exobrain-watcher
     environment:
       - EXOBRAIN_DATA_DIR=/data
+      - EXOBRAIN_CACHE_DIR=/cache
       - OLLAMA_HOST=http://ollama:11434
     volumes:
+      # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
+      # Derived data (container-local): staged, graphrag, logs
+      - exobrain_cache:/cache
     depends_on:
       - exobrain
     restart: unless-stopped
@@ -48,3 +58,6 @@ services:
 
 volumes:
   ollama_models:
+  exobrain_cache:
+    # Container-local volume for derived/regenerable data
+    # Can be safely deleted; will rebuild on next index
