@@ -271,5 +271,123 @@ def capture(
         typer.echo(f"Added title: {title}")
 
 
+# Import and add migrate subcommand
+from src.cli.commands.migrate import migrate as migrate_cmd
+
+
+@app.command()
+def migrate(
+    source: str = typer.Argument(
+        ...,
+        help="Source path: file, idea folder, or 'all' for entire ideas/ directory",
+    ),
+    dry_run: bool = typer.Option(
+        True,
+        "--dry-run/--execute",
+        help="Dry run shows what would be migrated without writing",
+    ),
+    transcripts_only: bool = typer.Option(
+        False,
+        "--transcripts-only",
+        "-t",
+        help="Only migrate transcript files",
+    ),
+    ideas_root: str = typer.Option(
+        "./ideas",
+        "--ideas-root",
+        help="Root directory for ideas/ (for 'all' migration)",
+    ),
+):
+    """Migrate content from ideas/ folder to ExoBrain.
+
+    Examples:
+        # Dry run on a single file
+        exobrain migrate ideas/0001-foo/transcripts/2026-01-07-bar.md
+
+        # Dry run on an idea space
+        exobrain migrate ideas/0001-foo
+
+        # Actually migrate (use --execute)
+        exobrain migrate ideas/0001-foo/transcripts/2026-01-07-bar.md --execute
+
+        # Migrate only transcripts from an idea space
+        exobrain migrate ideas/0001-foo --transcripts-only --execute
+    """
+    # Call the actual migrate function
+    from src.cli.commands.migrate import migrate as do_migrate
+
+    # We need to invoke it with the same args
+    # Since we're wrapping the typer command, just call the function directly
+    from pathlib import Path
+
+    from src.cli.commands.migrate import migrate_file, migrate_idea_space
+    from src.config import settings
+
+    source_path = Path(source)
+
+    if dry_run:
+        typer.echo("DRY RUN MODE (use --execute to actually migrate)\n")
+    else:
+        settings.ensure_dirs()
+
+    results = []
+
+    if source == "all":
+        ideas_path = Path(ideas_root)
+        if not ideas_path.exists():
+            typer.echo(f"Error: Ideas root not found: {ideas_path}", err=True)
+            raise typer.Exit(1)
+
+        for idea_dir in sorted(ideas_path.iterdir()):
+            if idea_dir.is_dir() and idea_dir.name.startswith("0"):
+                typer.echo(f"Processing: {idea_dir.name}")
+                results.extend(migrate_idea_space(idea_dir, dry_run, transcripts_only))
+
+    elif source_path.is_file():
+        from src.cli.commands.migrate import extract_metadata_from_readme
+
+        idea_metadata = None
+        for parent in source_path.parents:
+            readme = parent / "README.md"
+            if readme.exists() and "ideas" in str(parent):
+                idea_metadata = extract_metadata_from_readme(readme)
+                break
+        results.append(migrate_file(source_path, dry_run, idea_metadata))
+
+    elif source_path.is_dir():
+        results.extend(migrate_idea_space(source_path, dry_run, transcripts_only))
+
+    else:
+        typer.echo(f"Error: Source not found: {source}", err=True)
+        raise typer.Exit(1)
+
+    # Print results
+    typer.echo("\nMigration Results:")
+    typer.echo("-" * 60)
+
+    success_count = 0
+    for r in results:
+        status = r.get("status", "unknown")
+        source_file = r.get("source", "unknown")
+
+        if status in ("success", "dry-run"):
+            success_count += 1
+            typer.echo(f"[{status.upper()}] {Path(source_file).name}")
+            typer.echo(f"  ID: {r.get('doc_id')}")
+            typer.echo(f"  Type: {r.get('file_type')}")
+            if r.get("title"):
+                typer.echo(f"  Title: {r['title']}")
+            if r.get("tags"):
+                typer.echo(f"  Tags: {', '.join(r['tags'])}")
+        else:
+            typer.echo(f"[ERROR] {source_file}: {r.get('error')}")
+
+    typer.echo("-" * 60)
+    typer.echo(f"Total: {len(results)} files, {success_count} successful")
+
+    if dry_run and success_count > 0:
+        typer.echo("\nTo execute this migration, add --execute flag")
+
+
 if __name__ == "__main__":
     app()
