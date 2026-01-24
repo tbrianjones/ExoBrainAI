@@ -1,12 +1,41 @@
-# Claude Writer
+# Claude Writer + ExoBrain
 
-Filesystem is the database. Git versions content.
+Two-layer personal knowledge system:
+
+1. **ExoBrain** ; GraphRAG memory engine (Docker-based, local LLM)
+2. **Claude Writer** ; Ideation and content generation (Claude Code commands)
+
+## ExoBrain Quick Reference
+
+```bash
+# Start the engine
+docker compose up -d
+
+# Capture a thought
+echo "My idea..." | docker compose exec -T exobrain exobrain capture
+
+# Query your memory
+docker compose exec exobrain exobrain query "What themes emerge?"
+
+# Check status
+docker compose exec exobrain exobrain status
+```
+
+**Endpoints:**
+- API: http://localhost:8420
+- Logs: http://localhost:9998 (Dozzle)
+
+**Data locations:**
+- `$EXOBRAIN_DATA_DIR` ; Canonical data (raw/, overlay/) ; syncs via Dropbox
+- Container volume ; Derived data (staged/, graphrag/) ; regenerable
 
 ## Commands vs Agents vs Skills
 
-**Commands** interview the user, have dialogue, require input.
-**Agents** run autonomously in their own context, no further input needed.
-**Skills** are utilities invoked by commands or agents (not directly by users).
+| Type | Behavior |
+|------|----------|
+| **Commands** | Interview the user, have dialogue, require input |
+| **Agents** | Run autonomously in their own context, no further input needed |
+| **Skills** | Utilities invoked by commands or agents (not directly by users) |
 
 ## Commands
 
@@ -19,69 +48,87 @@ Filesystem is the database. Git versions content.
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
 | `/generate-new-view-command` | User wants to create a new specialized view generator |
-| `/publish-quarto` | Publish a view to ideas.tbrianjones.com (converts to Quarto, saves to site/posts/, marks source as published) |
+| `/publish-quarto` | Publish a view to ideas.tbrianjones.com |
 
 ## Agents
 
 | Agent | Invocation |
 |-------|------------|
-| `transcript-summary-generator` | Called by `/generate-transcript`; produces synthesized Ideas & Themes and Transcript Summary |
-| `transcript-raw-generator` | Called by `/generate-transcript`; produces verbatim Full Transcript with zero editing |
+| `transcript-summary-generator` | Called by `/generate-transcript`; produces synthesized Ideas & Themes |
+| `transcript-raw-generator` | Called by `/generate-transcript`; produces verbatim Full Transcript |
 
 ## Skills
 
 | Skill | Purpose |
 |-------|---------|
-| `exobrain` | Interface with ExoBrain memory engine for storage, annotation, and retrieval |
-| `title-generation` | Generate effective titles and headlines for any content type |
-| `summary-generation` | Generate summaries, abstracts, briefs, and meta descriptions |
-| `tag-generation` | Generate tags, hashtags, and topic classifications for any platform |
+| `exobrain` | Interface with ExoBrain memory engine (CLI and API) |
+| `title-generation` | Generate effective titles and headlines |
+| `summary-generation` | Generate summaries, abstracts, briefs |
+| `tag-generation` | Generate tags, hashtags, and classifications |
 
-## Folder Structure
+## Repository Structure
 
 ```
+├── engine/                 # ExoBrain memory engine
+│   └── src/
+│       ├── core/           # Models, raw ops, overlay ops, stager
+│       ├── graphrag/       # GraphRAG config, indexer, querier
+│       ├── cli/            # Typer CLI commands
+│       ├── api/            # FastAPI routes
+│       └── watcher/        # File watcher, scheduler
 ├── .claude/
-│   ├── agents/           # transcript-summary-generator, transcript-raw-generator
-│   ├── commands/         # ideate, instantiate-idea, generate-transcript, generate-view, etc.
-│   └── skills/           # exobrain, title-generation, summary-generation, tag-generation
-├── engine/               # ExoBrain memory engine (Docker-based)
-│   └── src/              # Python source: core, graphrag, cli, api, watcher
-├── ideas/NNNN-name/      # Idea spaces (will migrate to ExoBrain)
-│   ├── README.md         # Idea summary, origin, open questions
-│   ├── assets/           # Structured entities (characters, settings, concepts)
-│   ├── transcripts/      # Raw ideation captures
-│   └── views/            # Production content
-├── site/                 # Quarto site for ideas.tbrianjones.com
-│   ├── _quarto.yml       # Site config
-│   └── posts/            # Published posts
-└── templates/
-    ├── voices/             # Writing voice/style references
-    ├── poetry/             # Poetry generation frameworks
-    ├── infographics/       # Infographic generation frameworks
-    ├── title-generation/   # Title and headline generation framework
-    ├── summary-generation/ # Summary, abstract, and brief framework
-    ├── tag-generation/     # Tags, hashtags, and classification framework
-    ├── quarto/             # Quarto post framework and reference
-    └── command-generation/ # Meta-command frameworks
+│   ├── commands/           # User-invoked commands
+│   ├── agents/             # Autonomous subagents
+│   └── skills/             # exobrain, title-generation, etc.
+├── ideas/NNNN-name/        # Legacy idea spaces (migrating to ExoBrain)
+│   ├── README.md
+│   ├── assets/
+│   ├── transcripts/
+│   └── views/
+├── templates/
+│   ├── voices/             # Writing voice/style references
+│   ├── poetry/             # Poetry generation frameworks
+│   ├── infographics/       # Infographic generation frameworks
+│   └── ...
+├── site/                   # Quarto site for publishing
+├── docker-compose.yml
+└── .env.example
 ```
 
-## ExoBrain Memory Engine
+## ExoBrain CLI Commands
 
-ExoBrain provides GraphRAG-powered memory with zero-friction capture:
+Run via: `docker compose exec exobrain exobrain <command>`
 
-```bash
-# Start the engine
-docker compose up -d
+| Command | Description |
+|---------|-------------|
+| `init` | Create directories, pull Ollama models |
+| `status` | Show document counts, index status |
+| `doctor` | Validate config, check Ollama connectivity |
+| `capture [content]` | Capture new document (stdin or argument) |
+| `stage --all` | Stage all documents |
+| `stage --doc <id>` | Stage specific document |
+| `index` | Run incremental GraphRAG update |
+| `rebuild` | Full index rebuild |
+| `query "<text>"` | Global (theme) query |
+| `query --mode local "<text>"` | Local (entity) query |
+| `migrate <path>` | Migrate from ideas/ (dry-run by default) |
 
-# Capture a thought
-echo "My idea..." | docker compose exec exobrain exobrain capture
+## ExoBrain HTTP API
 
-# Query your memory
-docker compose exec exobrain exobrain query "What do I know about X?"
+Base: `http://localhost:8420`
+
 ```
-
-Data lives outside the repo at `$EXOBRAIN_DATA_DIR` (configured in `.env`).
-See `.claude/skills/exobrain.md` for full CLI and API documentation.
+GET  /health                 # Health check
+GET  /status                 # Full status
+POST /query/global           # Theme query
+POST /query/local            # Entity query
+GET  /doc/                   # List documents
+GET  /doc/{id}               # Get document
+GET  /doc/{id}/overlay       # Get overlay data
+POST /admin/stage            # Trigger staging
+POST /admin/index/incremental
+POST /admin/index/rebuild
+```
 
 ## Working in Idea Spaces
 
@@ -105,4 +152,4 @@ Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infogr
 ## Behavior
 
 - Always do work in feature branches. Propose this as soon as you launch.
-- **Infrastructure as code.** Never configure infrastructure manually via cloud consoles or CLI calls to services. All configuration should be defined in repository files, version controlled, and deployed via push. If something needs to change in GitHub, cloud services, or any external system, express it in code.
+- **Infrastructure as code.** Never configure infrastructure manually. All configuration in repository files, version controlled, deployed via push.
