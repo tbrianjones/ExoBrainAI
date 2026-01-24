@@ -2,7 +2,6 @@
 description: Creates new Architecture Decision Records (ADRs) documenting significant architectural choices. Use when user mentions create ADR, new ADR, document decision, record architecture choice, why did we choose, capture rationale, or architectural decision. Produces MADR-format ADRs with Agent Rules that flow into generated documentation.
 argument-hint: [topic]
 allowed-tools: Task
-disable-model-invocation: true
 ---
 
 # Create ADR
