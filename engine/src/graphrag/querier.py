@@ -54,11 +54,12 @@ def query(
     logger.info(f"Running {mode.value} query: {query_text[:50]}...")
 
     try:
+        # GraphRAG CLI v2.x
         cmd = [
-            "python", "-m", "graphrag.query",
+            "graphrag", "query",
             "--root", str(root),
             "--method", mode.value,
-            query_text,
+            "--query", query_text,
         ]
 
         if community_level is not None and mode == QueryMode.GLOBAL:

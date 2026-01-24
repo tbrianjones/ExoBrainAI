@@ -52,14 +52,11 @@ def run_index(incremental: bool = True) -> dict:
     logger.info(f"Running {'incremental' if incremental else 'full'} index on {staged_count} documents")
 
     try:
-        # GraphRAG CLI command
-        cmd = [
-            "python", "-m", "graphrag.index",
-            "--root", str(root),
-        ]
-
+        # GraphRAG CLI command (v2.x uses `graphrag index` or `graphrag update`)
         if incremental:
-            cmd.append("--update")
+            cmd = ["graphrag", "update", "--root", str(root)]
+        else:
+            cmd = ["graphrag", "index", "--root", str(root)]
 
         result = subprocess.run(
             cmd,

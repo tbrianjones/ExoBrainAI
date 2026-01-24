@@ -11,7 +11,7 @@ services:
       - EXOBRAIN_CACHE_DIR=/cache
       - EXOBRAIN_USER=${EXOBRAIN_USER:-Unknown}
       - EXOBRAIN_USER_EMAIL=${EXOBRAIN_USER_EMAIL:-}
-      - OLLAMA_HOST=http://ollama:11434
+      - EXOBRAIN_OLLAMA_HOST=http://ollama:11434
     volumes:
       # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
@@ -33,7 +33,7 @@ services:
     environment:
       - EXOBRAIN_DATA_DIR=/data
       - EXOBRAIN_CACHE_DIR=/cache
-      - OLLAMA_HOST=http://ollama:11434
+      - EXOBRAIN_OLLAMA_HOST=http://ollama:11434
     volumes:
       # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
