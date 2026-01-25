@@ -125,7 +125,7 @@ class StagingHandler(FileSystemEventHandler):
             if doc_id:
                 logger.info(f"Raw file deleted: {doc_id}")
                 # Optionally delete the staged version
-                staged_path = settings.staged_dir / f"{doc_id}.md"
+                staged_path = settings.staged_dir / f"{doc_id}.txt"
                 if staged_path.exists():
                     staged_path.unlink()
                     logger.info(f"Deleted staged file: {staged_path}")

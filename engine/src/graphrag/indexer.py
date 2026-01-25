@@ -20,19 +20,31 @@ class IndexError(Exception):
 def ensure_graphrag_initialized() -> None:
     """Ensure GraphRAG is initialized with settings.
 
-    Creates the settings.yaml file if it doesn't exist.
+    Creates the settings.yaml file and input symlink if they don't exist.
     """
+    # Ensure directories exist
+    settings.graphrag_dir.mkdir(parents=True, exist_ok=True)
+    settings.staged_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create settings.yaml if needed
     settings_path = settings.graphrag_dir / "settings.yaml"
     if not settings_path.exists():
         logger.info("Initializing GraphRAG settings...")
         write_graphrag_settings()
 
+    # Create symlink: graphrag/input -> staged/ (GraphRAG expects relative paths)
+    input_link = settings.graphrag_dir / "input"
+    if not input_link.exists():
+        logger.info(f"Creating symlink: {input_link} -> {settings.staged_dir}")
+        input_link.symlink_to(settings.staged_dir)
 
-def run_index(incremental: bool = True) -> dict:
+
+def run_index(incremental: bool = True, fast: bool = False) -> dict:
     """Run GraphRAG indexing.
 
     Args:
         incremental: If True, run incremental update; if False, full rebuild
+        fast: If True, use NLP-based extraction instead of LLM (much faster)
 
     Returns:
         Dictionary with indexing results
@@ -44,19 +56,20 @@ def run_index(incremental: bool = True) -> dict:
     root = get_graphrag_root()
 
     # Check if there are staged documents
-    staged_count = len(list(settings.staged_dir.glob("*.md"))) if settings.staged_dir.exists() else 0
+    staged_count = len(list(settings.staged_dir.glob("*.txt"))) if settings.staged_dir.exists() else 0
     if staged_count == 0:
         logger.warning("No staged documents to index")
         return {"status": "skipped", "reason": "no documents", "documents": 0}
 
-    logger.info(f"Running {'incremental' if incremental else 'full'} index on {staged_count} documents")
+    method = "fast" if fast else "standard"
+    logger.info(f"Running {method} {'incremental' if incremental else 'full'} index on {staged_count} documents")
 
     try:
         # GraphRAG CLI command (v2.x uses `graphrag index` or `graphrag update`)
         if incremental:
-            cmd = ["graphrag", "update", "--root", str(root)]
+            cmd = ["graphrag", "update", "--root", str(root), "--method", method]
         else:
-            cmd = ["graphrag", "index", "--root", str(root)]
+            cmd = ["graphrag", "index", "--root", str(root), "--method", method]
 
         result = subprocess.run(
             cmd,
@@ -117,28 +130,23 @@ def get_index_status() -> dict:
             "output_dir": str(output_dir),
         }
 
-    # Find the most recent output directory
-    output_dirs = sorted(output_dir.iterdir()) if output_dir.is_dir() else []
-
-    if not output_dirs:
-        return {
-            "indexed": False,
-            "output_dir": str(output_dir),
-        }
-
-    latest = output_dirs[-1]
-
+    # GraphRAG v2 puts files directly in output/ (not subdirectories)
     # Check for key artifacts
     artifacts = {
-        "entities": (latest / "create_final_entities.parquet").exists(),
-        "relationships": (latest / "create_final_relationships.parquet").exists(),
-        "communities": (latest / "create_final_communities.parquet").exists(),
-        "documents": (latest / "create_final_documents.parquet").exists(),
+        "entities": (output_dir / "entities.parquet").exists(),
+        "relationships": (output_dir / "relationships.parquet").exists(),
+        "communities": (output_dir / "communities.parquet").exists(),
+        "community_reports": (output_dir / "community_reports.parquet").exists(),
+        "documents": (output_dir / "documents.parquet").exists(),
+        "text_units": (output_dir / "text_units.parquet").exists(),
     }
 
+    # Index is considered complete if we have community_reports (final step)
+    # Without community_reports, global queries will fail
+    indexed = artifacts["community_reports"]
+
     return {
-        "indexed": all(artifacts.values()),
-        "output_dir": str(latest),
+        "indexed": indexed,
+        "output_dir": str(output_dir),
         "artifacts": artifacts,
-        "timestamp": latest.name if latest.is_dir() else None,
     }

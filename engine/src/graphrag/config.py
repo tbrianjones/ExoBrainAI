@@ -15,45 +15,50 @@ def get_graphrag_settings() -> dict:
     for GraphRAG v2.x configuration.
     """
     return {
-        # Models configuration (v2 format)
+        # Models configuration (v2 format with Ollama-specific settings)
         "models": {
             "default_chat_model": {
                 "type": "chat",
                 "model_provider": "openai",
                 "auth_type": "api_key",
-                "api_key": "NONE",
+                "api_key": "ollama",
                 "model": settings.llm_model,
                 "api_base": f"{settings.ollama_host}/v1",
-                "model_supports_json": False,  # Llama doesn't guarantee JSON
+                # CRITICAL: Local models don't reliably produce valid JSON
+                "model_supports_json": False,
                 "concurrent_requests": 1,  # Conservative for local
                 "async_mode": "threaded",
                 "retry_strategy": "exponential_backoff",
-                "max_retries": 3,
+                "max_retries": 2,  # Fewer retries; each retry wastes timeout budget
+                "request_timeout": 1200.0,  # 20 min; community_reports needs 2-3 min each
+                "max_tokens": 2048,  # Increased for community reports
+                "temperature": 0.0,  # Deterministic output for extraction
             },
             "default_embedding_model": {
                 "type": "embedding",
                 "model_provider": "openai",
                 "auth_type": "api_key",
-                "api_key": "NONE",
+                "api_key": "ollama",
                 "model": settings.embed_model,
                 "api_base": f"{settings.ollama_host}/v1",
                 "concurrent_requests": 1,
                 "async_mode": "threaded",
                 "retry_strategy": "exponential_backoff",
-                "max_retries": 3,
+                "max_retries": 2,
+                "request_timeout": 180.0,  # 3 min for embedding batches
             },
         },
-        # Input configuration
+        # Input configuration (uses symlink: graphrag/input -> staged/)
         "input": {
             "storage": {
                 "type": "file",
-                "base_dir": str(settings.staged_dir),
+                "base_dir": "input",  # Relative to graphrag root; symlinked to staged/
             },
             "file_type": "text",
         },
-        # Chunking
+        # Chunking: smaller chunks = better entity extraction across boundaries
         "chunks": {
-            "size": 300,  # Smaller chunks for local models
+            "size": 300,  # Smaller chunks prevent clustering failures
             "overlap": 50,
             "group_by_columns": ["id"],
         },
@@ -85,8 +90,9 @@ def get_graphrag_settings() -> dict:
         },
         "extract_graph": {
             "model_id": "default_chat_model",
-            "entity_types": ["person", "organization", "concept", "technology", "event"],
-            "max_gleanings": 1,
+            # Entity types tuned for personal knowledge base
+            "entity_types": ["person", "organization", "concept", "project", "technology", "idea", "book", "event"],
+            "max_gleanings": 0,  # Reduce LLM calls for local models
         },
         "summarize_descriptions": {
             "model_id": "default_chat_model",
@@ -100,8 +106,8 @@ def get_graphrag_settings() -> dict:
         },
         "community_reports": {
             "model_id": "default_chat_model",
-            "max_length": 2000,
-            "max_input_length": 8000,
+            "max_length": 1500,  # Fits in 8K context window
+            "max_input_length": 4000,  # Must fit in 8K context with output
         },
         "embed_graph": {
             "enabled": False,
@@ -110,7 +116,7 @@ def get_graphrag_settings() -> dict:
             "enabled": False,
         },
         "snapshots": {
-            "graphml": False,
+            "graphml": True,  # Enable for Gephi Lite visualization
             "embeddings": False,
         },
         # Query settings

@@ -23,6 +23,7 @@ docker compose exec exobrain exobrain status
 
 **Endpoints:**
 - API: http://localhost:8420
+- Graph: http://localhost:8081 (Gephi Lite)
 - Logs: http://localhost:9998 (Dozzle)
 
 **Data locations:**

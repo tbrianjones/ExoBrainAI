@@ -6,6 +6,21 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
+def _get_ollama_host() -> str:
+    """Determine Ollama host based on mode and environment."""
+    # Explicit override takes priority
+    explicit_host = os.environ.get("EXOBRAIN_OLLAMA_HOST", "").strip()
+    if explicit_host:
+        return explicit_host
+
+    # Otherwise, select based on mode
+    mode = os.environ.get("EXOBRAIN_OLLAMA_MODE", "native").lower()
+    if mode == "docker":
+        return "http://ollama:11434"
+    else:  # native (default)
+        return "http://host.docker.internal:11434"
+
+
 class Settings(BaseSettings):
     """ExoBrain settings loaded from environment."""
 
@@ -24,8 +39,9 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
 
     # Ollama settings
-    ollama_host: str = "http://localhost:11434"
-    llm_model: str = "llama3.1:8b"
+    ollama_mode: str = os.environ.get("EXOBRAIN_OLLAMA_MODE", "native")
+    ollama_host: str = _get_ollama_host()
+    llm_model: str = "llama3.1:8b"  # 8B recommended; use 3B only for testing
     embed_model: str = "nomic-embed-text"
 
     # Overlay settings

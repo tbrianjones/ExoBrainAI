@@ -36,26 +36,55 @@ def init():
     typer.echo(f"  - {settings.graphrag_dir}")
     typer.echo(f"  - {settings.logs_dir}")
 
+    # Create symlink: graphrag/input -> staged/ (GraphRAG expects relative paths)
+    input_link = settings.graphrag_dir / "input"
+    if not input_link.exists():
+        input_link.symlink_to(settings.staged_dir)
+        typer.echo(f"  - {input_link} -> {settings.staged_dir}")
+    else:
+        typer.echo(f"  - {input_link} (symlink exists)")
+
     # Initialize GraphRAG settings
     settings_path = write_graphrag_settings()
     typer.echo(f"  - {settings_path}")
 
     # Try to pull Ollama models
-    typer.echo(f"\nPulling Ollama models from {settings.ollama_host}...")
-    for model in [settings.llm_model, settings.embed_model]:
-        try:
-            typer.echo(f"  Pulling {model}...")
-            response = httpx.post(
-                f"{settings.ollama_host}/api/pull",
-                json={"name": model},
-                timeout=600.0,
-            )
-            if response.status_code == 200:
-                typer.echo(f"  [OK] {model}")
-            else:
-                typer.echo(f"  [WARN] Could not pull {model}: {response.status_code}")
-        except Exception as e:
-            typer.echo(f"  [WARN] Could not pull {model}: {e}")
+    typer.echo(f"\nOllama mode: {settings.ollama_mode}")
+    typer.echo(f"Ollama host: {settings.ollama_host}")
+
+    # Check if Ollama is reachable
+    try:
+        httpx.get(f"{settings.ollama_host}/api/tags", timeout=5.0)
+        ollama_available = True
+    except Exception:
+        ollama_available = False
+
+    if not ollama_available:
+        if settings.ollama_mode == "native":
+            typer.echo("\n[WARN] Native Ollama is not running.")
+            typer.echo("       Run: ./scripts/setup-native-ollama.sh")
+            typer.echo("\n       Or start it manually:")
+            typer.echo("         brew install ollama")
+            typer.echo("         ollama serve")
+        else:
+            typer.echo("\n[WARN] Docker Ollama is not running.")
+            typer.echo("       Start with: docker compose --profile docker up -d")
+    else:
+        typer.echo(f"\nPulling Ollama models...")
+        for model in [settings.llm_model, settings.embed_model]:
+            try:
+                typer.echo(f"  Pulling {model}...")
+                response = httpx.post(
+                    f"{settings.ollama_host}/api/pull",
+                    json={"name": model},
+                    timeout=600.0,
+                )
+                if response.status_code == 200:
+                    typer.echo(f"  [OK] {model}")
+                else:
+                    typer.echo(f"  [WARN] Could not pull {model}: {response.status_code}")
+            except Exception as e:
+                typer.echo(f"  [WARN] Could not pull {model}: {e}")
 
     typer.echo("\nDone. Add raw documents to the raw/ directory to get started.")
 
@@ -67,6 +96,7 @@ def status():
     from src.graphrag import get_index_status
 
     typer.echo(f"Data directory: {settings.data_dir}")
+    typer.echo(f"Ollama mode: {settings.ollama_mode}")
     typer.echo(f"Ollama host: {settings.ollama_host}")
     typer.echo(f"LLM model: {settings.llm_model}")
     typer.echo(f"Embed model: {settings.embed_model}")
@@ -74,7 +104,7 @@ def status():
     # Count files
     raw_count = len(list(settings.raw_dir.glob("*.md"))) if settings.raw_dir.exists() else 0
     staged_count = (
-        len(list(settings.staged_dir.glob("*.md"))) if settings.staged_dir.exists() else 0
+        len(list(settings.staged_dir.glob("*.txt"))) if settings.staged_dir.exists() else 0
     )
 
     typer.echo(f"\nDocuments:")
@@ -118,6 +148,7 @@ def doctor():
             typer.echo(f"[WARN] {name} does not exist: {path}")
 
     # Check Ollama connectivity
+    typer.echo(f"\nOllama mode: {settings.ollama_mode}")
     try:
         response = httpx.get(f"{settings.ollama_host}/api/tags", timeout=5.0)
         if response.status_code == 200:
@@ -134,7 +165,13 @@ def doctor():
         else:
             errors.append(f"Ollama returned status {response.status_code}")
     except Exception as e:
-        errors.append(f"Cannot connect to Ollama: {e}")
+        if settings.ollama_mode == "native":
+            errors.append(
+                f"Cannot connect to native Ollama at {settings.ollama_host}.\n"
+                "    Run: ./scripts/setup-native-ollama.sh"
+            )
+        else:
+            errors.append(f"Cannot connect to Ollama: {e}")
 
     if errors:
         typer.echo("\nErrors found:")
@@ -175,15 +212,23 @@ def index(
     incremental: bool = typer.Option(
         True, "--incremental/--full", help="Incremental or full indexing"
     ),
+    fast: bool = typer.Option(
+        False, "--fast", "-f", help="Use NLP-based extraction (faster, less accurate)"
+    ),
 ):
-    """Run GraphRAG indexing on staged documents."""
+    """Run GraphRAG indexing on staged documents.
+
+    Use --fast for much faster indexing using NLP instead of LLM for entity extraction.
+    Standard mode uses LLM for higher quality but is significantly slower.
+    """
     from src.graphrag import run_index
 
+    method = "fast" if fast else "standard"
     mode = "incremental" if incremental else "full"
-    typer.echo(f"Running {mode} index...")
+    typer.echo(f"Running {method} {mode} index...")
 
     try:
-        result = run_index(incremental=incremental)
+        result = run_index(incremental=incremental, fast=fast)
         typer.echo(f"Status: {result['status']}")
         if result.get("documents"):
             typer.echo(f"Documents: {result['documents']}")

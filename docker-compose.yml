@@ -1,3 +1,8 @@
+# Ollama mode: native (recommended) or docker
+# Set OLLAMA_MODE in .env file
+# - native: Ollama runs on host Mac with GPU acceleration (20-30x faster)
+# - docker: Ollama runs in container on CPU only (for testing)
+
 services:
   exobrain:
     build:
@@ -11,7 +16,8 @@ services:
       - EXOBRAIN_CACHE_DIR=/cache
       - EXOBRAIN_USER=${EXOBRAIN_USER:-Unknown}
       - EXOBRAIN_USER_EMAIL=${EXOBRAIN_USER_EMAIL:-}
-      - EXOBRAIN_OLLAMA_HOST=http://ollama:11434
+      # Ollama mode: native (GPU on host) or docker (CPU in container)
+      - EXOBRAIN_OLLAMA_MODE=${OLLAMA_MODE:-native}
     volumes:
       # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
@@ -19,9 +25,12 @@ services:
       - exobrain_cache:/cache
       # Legacy ideas folder (read-only, for migration)
       - ./ideas:/ideas:ro
-    depends_on:
-      ollama:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8420/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     command: ["python", "-m", "src.api.main"]
 
@@ -33,7 +42,7 @@ services:
     environment:
       - EXOBRAIN_DATA_DIR=/data
       - EXOBRAIN_CACHE_DIR=/cache
-      - EXOBRAIN_OLLAMA_HOST=http://ollama:11434
+      - EXOBRAIN_OLLAMA_MODE=${OLLAMA_MODE:-native}
     volumes:
       # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
@@ -44,20 +53,32 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "src.watcher.main"]
 
+  # Docker-based Ollama (only starts with --profile docker)
+  # Use: docker compose --profile docker up
   ollama:
     image: ollama/ollama:latest
     container_name: exobrain-ollama
+    profiles:
+      - docker
     ports:
       - "${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_models:/root/.ollama
+    environment:
+      # GraphRAG requires large context for community_reports (8K+ input)
+      # IMPORTANT: Docker Desktop must have 12GB+ RAM allocated
+      - OLLAMA_CONTEXT_LENGTH=8192
+      # Use fp16 for faster generation on Apple Silicon
+      - OLLAMA_KV_CACHE_TYPE=fp16
+      # Give model more time to load
+      - OLLAMA_KEEP_ALIVE=30m
     healthcheck:
-      # Use ollama CLI instead of curl (curl not in image)
+      # Basic check that Ollama is responding; model pull happens via init command
       test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 120s
     restart: unless-stopped
 
   dozzle:
@@ -69,6 +90,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - DOZZLE_FILTER=name=exobrain
+    restart: unless-stopped
+
+  gephi-lite:
+    image: ouestware/gephi-lite
+    container_name: exobrain-gephi
+    ports:
+      - "${GEPHI_PORT:-8081}:80"
     restart: unless-stopped
 
 volumes:

@@ -93,7 +93,7 @@ def stage_doc(doc_id: str, days: int | None = None) -> Path | None:
     content = format_staged_doc(raw, overlay)
 
     settings.staged_dir.mkdir(parents=True, exist_ok=True)
-    path = settings.staged_dir / f"{doc_id}.md"
+    path = settings.staged_dir / f"{doc_id}.txt"
     path.write_text(content, encoding="utf-8")
 
     return path
@@ -121,7 +121,7 @@ def stage_all(days: int | None = None) -> list[Path]:
         content = format_staged_doc(raw, overlay)
 
         settings.staged_dir.mkdir(parents=True, exist_ok=True)
-        path = settings.staged_dir / f"{doc_id}.md"
+        path = settings.staged_dir / f"{doc_id}.txt"
         path.write_text(content, encoding="utf-8")
         staged_paths.append(path)
 
@@ -137,7 +137,7 @@ def get_staged_doc(doc_id: str) -> str | None:
     Returns:
         Staged document content, or None if not found
     """
-    path = settings.staged_dir / f"{doc_id}.md"
+    path = settings.staged_dir / f"{doc_id}.txt"
     if not path.exists():
         return None
     return path.read_text(encoding="utf-8")
@@ -151,7 +151,7 @@ def list_staged_docs() -> list[str]:
     """
     if not settings.staged_dir.exists():
         return []
-    return [p.stem for p in settings.staged_dir.glob("*.md")]
+    return [p.stem for p in settings.staged_dir.glob("*.txt")]
 
 
 def delete_staged_doc(doc_id: str) -> bool:
@@ -163,7 +163,7 @@ def delete_staged_doc(doc_id: str) -> bool:
     Returns:
         True if deleted, False if not found
     """
-    path = settings.staged_dir / f"{doc_id}.md"
+    path = settings.staged_dir / f"{doc_id}.txt"
     if path.exists():
         path.unlink()
         return True
@@ -180,7 +180,7 @@ def clean_staged() -> int:
         return 0
 
     count = 0
-    for path in settings.staged_dir.glob("*.md"):
+    for path in settings.staged_dir.glob("*.txt"):
         path.unlink()
         count += 1
     return count

@@ -17,5 +17,6 @@ aiofiles>=23.2.0
 pyyaml>=6.0.0
 
 # Data processing
-pandas>=2.1.0
+# Pin pandas <3.0 to avoid ArrowStringArray serialization bug
+pandas>=2.1.0,<3.0.0
 pyarrow>=14.0.0

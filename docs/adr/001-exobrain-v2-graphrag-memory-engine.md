@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-01-24
-- **Updated:** 2026-01-24
+- **Updated:** 2026-01-25
 - **Tags:** architecture, infrastructure, graphrag, local-first
 - **Impact:** High
 
@@ -68,11 +68,74 @@ The system separates into:
   - `overlay/annotations/{date}.jsonl`: Append-only annotation records
 
 - **Derived data** (`$EXOBRAIN_CACHE_DIR`, container volume):
-  - `staged/{uuidv7}.md`: Merged raw + aggregated overlays
-  - `graphrag/`: Index artifacts (parquet files, embeddings)
+  - `staged/{uuidv7}.txt`: Merged raw + aggregated overlays
+  - `graphrag/output/`: Index artifacts (parquet files, GraphML)
+  - `graphrag/cache/`: LLM response cache
   - `logs/`: Application logs
 
 Staging aggregates all overlay records for a document into a single view. GraphRAG indexes the staged documents. Everything in the cache is regenerable from canonical data.
+
+## Infrastructure Requirements
+
+### Ollama Deployment Options
+
+**CRITICAL**: Ollama in Docker on Mac runs on CPU only (no GPU access). This is 20-30x slower than native. For production use, install Ollama natively.
+
+| Deployment | Tokens/sec | Recommended For |
+|------------|-----------|-----------------|
+| Native Ollama (Mac) | 30-50 | Production indexing |
+| Docker Ollama (Mac) | 1-2 | Testing only |
+
+#### Option A: Native Ollama (Recommended)
+
+1. Set in `.env`: `OLLAMA_MODE=native`
+2. Run setup script: `./scripts/setup-native-ollama.sh`
+3. Start containers: `docker compose up -d`
+
+The setup script installs Ollama via Homebrew, starts the service, and pulls required models.
+
+#### Option B: Docker Ollama (Testing Only)
+
+1. Set in `.env`: `OLLAMA_MODE=docker`
+2. Start with profile: `docker compose --profile docker up -d`
+
+Only use this for basic testing; indexing will be too slow for real data.
+
+### Docker Desktop Memory
+
+If using Docker Ollama, Docker Desktop must be configured with adequate memory:
+
+| Model | Minimum Docker RAM | Recommended |
+|-------|-------------------|-------------|
+| llama3.2:3b | 6GB | 8GB |
+| llama3.1:8b | 10GB | 12GB |
+
+On a 16GB Mac, allocate 10GB to Docker (Settings → Resources → Memory). This leaves 6GB for macOS.
+
+**Failure mode**: If Docker has insufficient memory, Ollama loads the model successfully but the runner process is killed during inference with "signal: killed". The indexing appears to stall at `extract_graph` or `community_reports` with no error message.
+
+### Ollama Configuration
+
+Critical environment variables in `docker-compose.yml`:
+
+```yaml
+environment:
+  - OLLAMA_CONTEXT_LENGTH=8192    # Minimum for community_reports
+  - OLLAMA_KV_CACHE_TYPE=fp16     # Faster on Apple Silicon
+  - OLLAMA_KEEP_ALIVE=30m         # Keep model loaded between calls
+```
+
+### GraphRAG v2.x Configuration
+
+Key settings in `engine/src/graphrag/config.py`:
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| `model_supports_json` | `False` | Local models don't reliably produce valid JSON |
+| `request_timeout` | `1200.0` | Community reports take 2-3 min each |
+| `max_retries` | `2` | Fewer retries; each wastes timeout budget |
+| `chunks.size` | `300` | Smaller chunks improve entity extraction |
+| `community_reports.max_input_length` | `4000` | Must fit in 8K context with output |
 
 ## Consequences
 
@@ -92,7 +155,10 @@ Staging aggregates all overlay records for a document into a single view. GraphR
 - **Query scanning**: Date-partitioned JSONL requires scanning multiple files to find all annotations for a document (mitigated by overlay window configuration)
 - **No schema enforcement at write**: Append-only means malformed data can accumulate (mitigated by Pydantic validation in API/CLI)
 - **Docker overhead**: Requires Docker Desktop running; not a single binary
-- **Ollama memory**: Local LLM requires significant RAM (8GB+ for Llama 3.1 8B)
+- **No GPU access in Docker on Mac**: Ollama in Docker runs on CPU only (20-30x slower); requires native Ollama for production use
+- **Significant RAM requirements**: Docker Desktop needs 10GB+ for llama3.1:8b; on 16GB machines, this constrains other applications during indexing
+- **Long indexing times**: Community reports generation takes 2-3 minutes per community; a 50-document index may take 1-2 hours
+- **Silent OOM failures**: Insufficient Docker memory causes model runner to be killed without clear error messages
 - **Eventual consistency**: File watcher has debounce delay; changes not immediately indexed
 
 ### Neutral
@@ -117,9 +183,25 @@ Staging aggregates all overlay records for a document into a single view. GraphR
 
 8. **SHOULD** use `--link` and `--link-note` together when creating document relationships. See `engine/src/cli/main.py:annotate` command.
 
+9. **MUST** verify Docker Desktop has 10GB+ memory before running indexing with llama3.1:8b. Check with `docker system info | grep "Total Memory"`.
+
+10. **MUST** clear GraphRAG cache after changing `engine/src/graphrag/config.py`. Settings are written to `settings.yaml` on first run; delete `/cache/graphrag/settings.yaml` to regenerate.
+
+11. **SHOULD** test indexing with `--method fast` (NLP-based) before attempting full LLM indexing to verify pipeline works end-to-end.
+
+12. **MUST NOT** set `model_supports_json: True` for Ollama models. Local models produce malformed JSON that causes silent entity extraction failures.
+
+13. **MUST** use native Ollama on Mac for production indexing. Docker Ollama runs on CPU only (1-2 tok/sec vs 30-50 tok/sec native). Set `OLLAMA_MODE=native` in `.env` and run `./scripts/setup-native-ollama.sh`.
+
+14. **SHOULD** run `exobrain stage --all` after modifying overlay files. The watcher currently does not auto-restage on overlay changes (known limitation).
+
+15. **MUST** regenerate `settings.yaml` after changing entity types. Delete `/cache/graphrag/settings.yaml` and run `exobrain init` to apply new entity type configuration.
+
 ## References
 
 - PRD: `docs/active/20260123-exobrain-v2-graphrag-memory-engine-prd-chatgpt.md`
 - Development Plan: `docs/active/20260124-exobrain-v2-graphrag-memory-engine-dev-plan-claude.md`
+- Best Practices: `docs/active/graphrag-ollama-best-practices.md`
 - GraphRAG: https://github.com/microsoft/graphrag
+- GraphRAG Configuration: https://microsoft.github.io/graphrag/config/yaml/
 - UUIDv7: https://www.rfc-editor.org/rfc/rfc9562.html
