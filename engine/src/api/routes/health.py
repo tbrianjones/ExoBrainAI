@@ -20,7 +20,7 @@ async def status():
     """Get ExoBrain status."""
     raw_count = len(list(settings.raw_dir.glob("*.md"))) if settings.raw_dir.exists() else 0
     staged_count = (
-        len(list(settings.staged_dir.glob("*.md"))) if settings.staged_dir.exists() else 0
+        len(list(settings.staged_dir.glob("*.txt"))) if settings.staged_dir.exists() else 0
     )
     idx_status = get_index_status()
 
