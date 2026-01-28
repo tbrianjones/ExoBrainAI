@@ -12,13 +12,14 @@ COPY pyproject.toml .
 COPY README.md .
 
 # Install dependencies only (from pyproject.toml)
-RUN pip install --no-cache-dir ".[graphrag,api,watcher,dev]"
+# Note: graphrag excluded due to azure-identity version conflict; reconnect later
+RUN pip install --no-cache-dir ".[api,watcher,dev]"
 
 # Copy application code
 COPY . .
 
 # Re-install to pick up source code
-RUN pip install --no-cache-dir ".[graphrag,api,watcher,dev]"
+RUN pip install --no-cache-dir ".[api,watcher,dev]"
 
 # Default command (CLI; override in docker-compose)
 CMD ["python", "-m", "src.cli.main"]
