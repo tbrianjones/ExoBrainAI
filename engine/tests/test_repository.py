@@ -839,3 +839,153 @@ class TestObjectRepoListCaseSensitivity:
 
         results_upper = repo.list(type_name="URL")
         assert any(r["id"] == obj["id"] for r in results_upper)
+
+
+class TestLikeEscaping:
+    """Test that LIKE wildcards in IDs are properly escaped."""
+
+    def test_resolve_id_with_percent(self, bootstrapped_db):
+        """A prefix containing '%' should not match all objects."""
+        repo = ObjectRepo(bootstrapped_db)
+        # '%' as a prefix should not accidentally match everything
+        result = repo.resolve_id("%%%%%%%%")
+        assert result is None
+
+    def test_resolve_id_with_underscore(self, bootstrapped_db):
+        """A prefix containing '_' should not act as single-char wildcard."""
+        repo = ObjectRepo(bootstrapped_db)
+        result = repo.resolve_id("________-____-____-____")
+        assert result is None
+
+    def test_get_by_prefix_with_percent(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        result = repo.get_by_prefix("%%%%%%%%")
+        assert result is None
+
+
+class TestSearchExcludesBootstrap:
+    """Test that FTS5 search excludes bootstrap type/space/tag objects."""
+
+    def test_search_does_not_return_bootstrap_types(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        # "Document" is a bootstrap type title
+        results = repo.search("Document")
+        bootstrap_ids = set(BOOTSTRAP_IDS.values())
+        for r in results:
+            assert r["id"] not in bootstrap_ids, f"Bootstrap object {r['id']} found in search results"
+
+    def test_search_does_not_return_bootstrap_spaces(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        results = repo.search("Inbox")
+        bootstrap_ids = set(BOOTSTRAP_IDS.values())
+        for r in results:
+            assert r["id"] not in bootstrap_ids
+
+
+class TestPathTraversalGuard:
+    """Test that FileRepo rejects path traversal attempts."""
+
+    def test_validate_path_rejects_traversal(self, _patched_settings):
+        """_validate_path should raise on paths that escape files_dir."""
+        repo_cls = FileRepo
+        from pathlib import Path
+        traversal_path = _patched_settings.files_dir / ".." / ".." / "etc" / "passwd"
+        with pytest.raises(ValueError, match="Path traversal"):
+            repo_cls._validate_path(traversal_path)
+
+    def test_validate_path_accepts_normal(self, _patched_settings):
+        """_validate_path should accept paths within files_dir."""
+        repo_cls = FileRepo
+        normal_path = _patched_settings.files_dir / "ab" / "cd" / "test.txt"
+        normal_path.parent.mkdir(parents=True, exist_ok=True)
+        normal_path.touch()
+        result = repo_cls._validate_path(normal_path)
+        assert result is not None
+
+
+class TestUnicodeFTS5:
+    """Test that FTS5 handles Unicode content correctly."""
+
+    def test_search_unicode_content(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["note"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="日本語テスト",
+            content="これはテストです。Unicode content works.",
+        )
+        results = repo.search("Unicode")
+        assert any(r["id"] == obj["id"] for r in results)
+
+    def test_search_emoji_content(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["note"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Emoji Test",
+            content="This has emojis 🎉 and special chars",
+        )
+        # Search by non-emoji part of the content
+        results = repo.search("emojis")
+        assert any(r["id"] == obj["id"] for r in results)
+
+
+class TestNullVsEmptyString:
+    """Test NULL vs empty string handling in objects."""
+
+    def test_create_with_none_summary(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="No Summary",
+            summary=None,
+        )
+        fetched = repo.get(obj["id"])
+        assert fetched["summary"] is None
+
+    def test_create_with_empty_string_summary(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Empty Summary",
+            summary="",
+        )
+        fetched = repo.get(obj["id"])
+        assert fetched["summary"] == ""
+
+    def test_create_with_none_content(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="No Content",
+            content=None,
+        )
+        fetched = repo.get(obj["id"])
+        assert fetched["content"] is None
+
+
+class TestFileRepoReplacement:
+    """Test that attaching a file to an object that already has one replaces it."""
+
+    def test_attach_replaces_existing(self, sample_objects, _patched_settings):
+        conn = sample_objects["conn"]
+        repo = FileRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        # Attach first file
+        source1 = _patched_settings.data_dir / "first.txt"
+        source1.write_text("First attachment")
+        result1 = repo.attach(obj_id, source1)
+
+        # Attach second file (should replace)
+        source2 = _patched_settings.data_dir / "second.txt"
+        source2.write_text("Second attachment")
+        result2 = repo.attach(obj_id, source2)
+
+        # Should have second file's content
+        full_path = repo.get_full_path(obj_id)
+        assert full_path.read_text() == "Second attachment"
+        assert result2["sha256"] != result1["sha256"]

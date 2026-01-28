@@ -107,3 +107,59 @@ class TestCheckIntegrity:
         assert result["ok"] is True
         assert result["integrity"] == "ok"
         assert result["foreign_key_violations"] == 0
+
+
+class TestSplitSql:
+    """Test the _split_sql helper for parsing multi-statement SQL."""
+
+    def test_simple_statements(self):
+        from src.core.db import _split_sql
+        sql = "CREATE TABLE t1 (id INT);\nCREATE TABLE t2 (id INT);"
+        stmts = _split_sql(sql)
+        assert len(stmts) == 2
+
+    def test_trigger_with_begin_end(self):
+        from src.core.db import _split_sql
+        sql = """CREATE TRIGGER test_trigger AFTER INSERT ON t1 BEGIN
+    UPDATE t2 SET col = 1;
+    INSERT INTO t3 VALUES (1);
+END;"""
+        stmts = _split_sql(sql)
+        assert len(stmts) == 1
+        assert "BEGIN" in stmts[0]
+        assert "END" in stmts[0]
+
+    def test_mixed_triggers_and_statements(self):
+        from src.core.db import _split_sql
+        sql = """CREATE TABLE t1 (id INT);
+CREATE TRIGGER test_trigger AFTER INSERT ON t1 BEGIN
+    UPDATE t1 SET id = 0;
+END;
+CREATE TABLE t2 (id INT);"""
+        stmts = _split_sql(sql)
+        assert len(stmts) == 3
+
+    def test_empty_input(self):
+        from src.core.db import _split_sql
+        assert _split_sql("") == []
+
+    def test_comment_only(self):
+        from src.core.db import _split_sql
+        assert _split_sql("-- just a comment") == []
+
+    def test_statement_without_trailing_semicolon(self):
+        from src.core.db import _split_sql
+        stmts = _split_sql("CREATE TABLE t1 (id INT)")
+        assert len(stmts) == 1
+
+
+class TestFTS5IntegrityCheck:
+    """Test FTS5 integrity check (used by doctor command)."""
+
+    def test_fts5_integrity_passes_on_clean_db(self, bootstrapped_db):
+        """FTS5 integrity-check command should succeed on a clean database."""
+        # This is the same check the doctor command runs
+        try:
+            bootstrapped_db.execute("INSERT INTO objects_fts(objects_fts) VALUES('integrity-check')")
+        except Exception:
+            pytest.fail("FTS5 integrity check failed on clean database")

@@ -15,6 +15,11 @@ from src.config import settings
 from src.core.models import generate_id
 
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcard characters for safe use in LIKE clauses."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class ObjectRepo:
     """CRUD operations for ExoBrain objects."""
 
@@ -63,6 +68,7 @@ class ObjectRepo:
         """
         if len(prefix) < 8:
             return None
+        safe_prefix = _escape_like(prefix)
         rows = self.conn.execute(
             """SELECT o.*,
                       t.title as type_name,
@@ -70,8 +76,8 @@ class ObjectRepo:
                FROM objects o
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
-               WHERE o.id LIKE ?""",
-            (prefix + "%",),
+               WHERE o.id LIKE ? ESCAPE '\\'""",
+            (safe_prefix + "%",),
         ).fetchall()
         if len(rows) == 1:
             return dict(rows[0])
@@ -87,8 +93,10 @@ class ObjectRepo:
             return row["id"]
         # Try prefix match
         if len(id_or_prefix) >= 8:
+            safe_prefix = _escape_like(id_or_prefix)
             rows = self.conn.execute(
-                "SELECT id FROM objects WHERE id LIKE ?", (id_or_prefix + "%",)
+                "SELECT id FROM objects WHERE id LIKE ? ESCAPE '\\'",
+                (safe_prefix + "%",),
             ).fetchall()
             if len(rows) == 1:
                 return rows[0]["id"]
@@ -202,9 +210,9 @@ class ObjectRepo:
         cursor = self.conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
         self.conn.commit()
 
-        # Clean up disk file after DB commit
+        # Clean up disk file after DB commit (with path traversal guard)
         if file_info:
-            full_path = settings.files_dir / file_info["path"]
+            full_path = FileRepo._validate_path(settings.files_dir / file_info["path"])
             if full_path.exists():
                 full_path.unlink()
             # Clean up empty shard directories
@@ -225,8 +233,19 @@ class ObjectRepo:
         """
         # Quote the query to force literal matching; escape internal quotes
         safe_query = '"' + query.replace('"', '""') + '"'
+
+        # Exclude bootstrap types from search results (same as list())
+        from src.core.bootstrap import BOOTSTRAP_IDS
+
+        bootstrap_type_ids = [
+            BOOTSTRAP_IDS["type"],
+            BOOTSTRAP_IDS["space"],
+            BOOTSTRAP_IDS["tag"],
+        ]
+        placeholders = ",".join("?" for _ in bootstrap_type_ids)
+
         rows = self.conn.execute(
-            """SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
+            f"""SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
                       o.created_at, o.updated_at,
                       t.title as type_name,
                       s.title as space_name,
@@ -236,9 +255,10 @@ class ObjectRepo:
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
                WHERE objects_fts MATCH ?
+               AND o.type_id NOT IN ({placeholders})
                ORDER BY rank
                LIMIT ?""",
-            (safe_query, limit),
+            (safe_query, *bootstrap_type_ids, limit),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -267,6 +287,60 @@ class ObjectRepo:
                ORDER BY cnt DESC"""
         ).fetchall()
         return {r["type_name"]: r["cnt"] for r in rows}
+
+    def list_types(self) -> list[dict]:
+        """List all type objects."""
+        from src.core.bootstrap import BOOTSTRAP_IDS
+
+        rows = self.conn.execute(
+            """SELECT id, title, summary FROM objects
+               WHERE type_id = ? ORDER BY title""",
+            (BOOTSTRAP_IDS["type"],),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def list_spaces(self) -> list[dict]:
+        """List all space objects."""
+        from src.core.bootstrap import BOOTSTRAP_IDS
+
+        rows = self.conn.execute(
+            """SELECT id, title, summary FROM objects
+               WHERE type_id = ? ORDER BY summary, title""",
+            (BOOTSTRAP_IDS["space"],),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def resolve_type_by_name(self, name: str) -> str | None:
+        """Resolve a type name to its ID. Returns None if not found."""
+        from src.core.bootstrap import BOOTSTRAP_IDS
+
+        row = self.conn.execute(
+            """SELECT id FROM objects WHERE type_id = ? AND LOWER(title) = ?""",
+            (BOOTSTRAP_IDS["type"], name.lower()),
+        ).fetchone()
+        return row["id"] if row else None
+
+    def resolve_space_by_name(self, name: str) -> str | None:
+        """Resolve a space name to its ID. Matches title or summary."""
+        from src.core.bootstrap import BOOTSTRAP_IDS
+
+        row = self.conn.execute(
+            """SELECT id FROM objects WHERE type_id = ?
+               AND (LOWER(title) = ? OR LOWER(summary) = ?)""",
+            (BOOTSTRAP_IDS["space"], name.lower(), name.lower()),
+        ).fetchone()
+        return row["id"] if row else None
+
+    def resolve_prefix_matches(self, prefix: str) -> list[dict]:
+        """Return all objects matching a prefix (for ambiguity reporting)."""
+        if len(prefix) < 8:
+            return []
+        safe_prefix = _escape_like(prefix)
+        rows = self.conn.execute(
+            "SELECT id, title FROM objects WHERE id LIKE ? ESCAPE '\\'",
+            (safe_prefix + "%",),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 class TagRepo:
@@ -403,6 +477,19 @@ class FileRepo:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
+    @staticmethod
+    def _validate_path(full_path: Path) -> Path:
+        """Validate that a resolved path stays inside the files directory.
+
+        Prevents path traversal attacks where a tampered DB path value
+        like '../../important_file' could escape the storage directory.
+        """
+        resolved = full_path.resolve()
+        files_root = settings.files_dir.resolve()
+        if not str(resolved).startswith(str(files_root)):
+            raise ValueError(f"Path traversal detected: {full_path}")
+        return resolved
+
     def _sharded_path(self, object_id: str, extension: str) -> Path:
         """Compute the sharded storage path for a file.
 
@@ -475,8 +562,8 @@ class FileRepo:
         self.conn.execute("DELETE FROM files WHERE object_id = ?", (object_id,))
         self.conn.commit()
 
-        # Then delete file from disk
-        full_path = settings.files_dir / row["path"]
+        # Then delete file from disk (with path traversal guard)
+        full_path = self._validate_path(settings.files_dir / row["path"])
         if full_path.exists():
             full_path.unlink()
 
@@ -503,7 +590,7 @@ class FileRepo:
         ).fetchone()
         if not row:
             return None
-        return settings.files_dir / row["path"]
+        return self._validate_path(settings.files_dir / row["path"])
 
     def count(self) -> int:
         """Count total file attachments."""

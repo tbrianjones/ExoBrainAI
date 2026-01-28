@@ -12,7 +12,7 @@ services:
       dockerfile: Dockerfile
     container_name: exobrain
     ports:
-      - "${EXOBRAIN_API_PORT:-8420}:8420"
+      - "127.0.0.1:${EXOBRAIN_API_PORT:-8420}:8420"
     environment:
       - EXOBRAIN_DATA_DIR=/data
       - EXOBRAIN_CACHE_DIR=/cache
@@ -62,7 +62,7 @@ services:
     profiles:
       - docker
     ports:
-      - "${OLLAMA_PORT:-11434}:11434"
+      - "127.0.0.1:${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama_models:/root/.ollama
     environment:
@@ -82,7 +82,7 @@ services:
     image: amir20/dozzle:latest
     container_name: exobrain-dozzle
     ports:
-      - "${DOZZLE_PORT:-9998}:8080"
+      - "127.0.0.1:${DOZZLE_PORT:-9998}:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -96,7 +96,7 @@ services:
     profiles:
       - graphrag
     ports:
-      - "${GEPHI_PORT:-8081}:80"
+      - "127.0.0.1:${GEPHI_PORT:-8081}:80"
     restart: unless-stopped
 
 volumes:

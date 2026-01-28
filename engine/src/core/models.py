@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
-from uuid_extensions import uuid7
+from uuid_extensions import uuid7  # pip package: uuid7
 
 
 def generate_id() -> str:

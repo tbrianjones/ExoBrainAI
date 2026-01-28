@@ -65,7 +65,7 @@ def _split_sql(sql_block: str) -> list[str]:
 
 def get_db_path() -> Path:
     """Return the path to the SQLite database file."""
-    return settings.data_dir / "exobrain.db"
+    return settings.db_path
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:

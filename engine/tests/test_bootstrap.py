@@ -1,5 +1,7 @@
 """Tests for src.core.bootstrap: type system initialization."""
 
+import sqlite3
+
 import pytest
 
 from src.core.bootstrap import (
@@ -108,3 +110,20 @@ class TestBootstrapDeterminism:
     def test_get_space_id_raises_for_unknown(self):
         with pytest.raises(KeyError):
             get_space_id("nonexistent_space")
+
+
+class TestBootstrapForeignKeyEnforcement:
+    """Test that FKs are properly re-enabled after bootstrap."""
+
+    def test_fk_enforced_after_bootstrap(self, bootstrapped_db):
+        """After bootstrap, foreign keys should be ON and enforced."""
+        fk_status = bootstrapped_db.execute("PRAGMA foreign_keys").fetchone()[0]
+        assert fk_status == 1, "Foreign keys should be enabled after bootstrap"
+
+    def test_fk_violation_after_bootstrap(self, bootstrapped_db):
+        """Inserting a bad FK reference should fail after bootstrap completes."""
+        with pytest.raises(sqlite3.IntegrityError):
+            bootstrapped_db.execute(
+                "INSERT INTO objects (id, type_id, space_id, title) VALUES (?, ?, ?, ?)",
+                ("test-bad-fk", "nonexistent-type", "nonexistent-space", "Bad FK"),
+            )

@@ -99,15 +99,12 @@ def _resolve_id(conn, id_or_prefix: str) -> str:
     resolved = repo.resolve_id(id_or_prefix)
     if not resolved:
         # Check if prefix is ambiguous (multiple matches)
-        if len(id_or_prefix) >= 8:
-            rows = conn.execute(
-                "SELECT id, title FROM objects WHERE id LIKE ?", (id_or_prefix + "%",)
-            ).fetchall()
-            if len(rows) > 1:
-                typer.echo(f"Ambiguous prefix '{id_or_prefix}'; matches {len(rows)} objects:", err=True)
-                for r in rows[:10]:
-                    typer.echo(f"  {r['id'][:12]}  {r['title']}", err=True)
-                raise typer.Exit(1)
+        matches = repo.resolve_prefix_matches(id_or_prefix)
+        if len(matches) > 1:
+            typer.echo(f"Ambiguous prefix '{id_or_prefix}'; matches {len(matches)} objects:", err=True)
+            for m in matches[:10]:
+                typer.echo(f"  {m['id'][:12]}  {m['title']}", err=True)
+            raise typer.Exit(1)
         typer.echo(f"Object not found: {id_or_prefix}", err=True)
         raise typer.Exit(1)
     return resolved
@@ -116,6 +113,7 @@ def _resolve_id(conn, id_or_prefix: str) -> str:
 def _resolve_type_id(conn, type_name: str) -> str:
     """Resolve a type name to its object ID."""
     from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
 
     # Check bootstrap types first (case-insensitive).
     # Keys containing "/" are spaces (e.g., "primitives/type"), not types.
@@ -123,21 +121,14 @@ def _resolve_type_id(conn, type_name: str) -> str:
         if key == type_name.lower() and "/" not in key:
             return obj_id
 
-    # Try DB lookup
-    row = conn.execute(
-        """SELECT id FROM objects WHERE type_id = ? AND LOWER(title) = ?""",
-        (BOOTSTRAP_IDS["type"], type_name.lower()),
-    ).fetchone()
-    if row:
-        return row["id"]
+    # Try DB lookup via repository
+    repo = ObjectRepo(conn)
+    resolved = repo.resolve_type_by_name(type_name)
+    if resolved:
+        return resolved
 
     typer.echo(f"Unknown type: {type_name}", err=True)
     raise typer.Exit(1)
-
-
-def _escape_like(value: str) -> str:
-    """Escape LIKE wildcard characters (%, _, \\) in a value."""
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _resolve_space_id(conn, space_name: str) -> str:
@@ -146,19 +137,17 @@ def _resolve_space_id(conn, space_name: str) -> str:
     Matches by: bootstrap key, exact title, or exact summary (hierarchical path).
     """
     from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
 
     # Check bootstrap spaces first (exact key match)
     if space_name in BOOTSTRAP_IDS:
         return BOOTSTRAP_IDS[space_name]
 
-    # Try DB lookup: exact title match or exact summary match
-    row = conn.execute(
-        """SELECT id FROM objects WHERE type_id = ?
-           AND (LOWER(title) = ? OR LOWER(summary) = ?)""",
-        (BOOTSTRAP_IDS["space"], space_name.lower(), space_name.lower()),
-    ).fetchone()
-    if row:
-        return row["id"]
+    # Try DB lookup via repository
+    repo = ObjectRepo(conn)
+    resolved = repo.resolve_space_by_name(space_name)
+    if resolved:
+        return resolved
 
     typer.echo(f"Unknown space: {space_name}. Create it with 'exobrain space create {space_name}'", err=True)
     raise typer.Exit(1)
@@ -268,6 +257,15 @@ def doctor(
     with _db_session() as conn:
         integrity = check_integrity(conn)
 
+        # FTS5 integrity check
+        fts_ok = True
+        try:
+            conn.execute("INSERT INTO objects_fts(objects_fts) VALUES('integrity-check')")
+            fts_status = "ok"
+        except Exception as e:
+            fts_ok = False
+            fts_status = str(e)
+
         # Check for orphaned files on disk
         orphaned_files = []
         if settings.files_dir.exists():
@@ -280,10 +278,13 @@ def doctor(
                     if not row:
                         orphaned_files.append(str(file_path))
 
+    all_ok = integrity["ok"] and fts_ok
+
     output = {
         "integrity": integrity["integrity"],
         "foreign_key_violations": integrity["foreign_key_violations"],
-        "ok": integrity["ok"],
+        "fts_status": fts_status,
+        "ok": all_ok,
         "orphaned_files": orphaned_files,
     }
 
@@ -295,6 +296,10 @@ def doctor(
         else:
             typer.echo(f"[FAIL] Integrity: {integrity['integrity']}")
             typer.echo(f"[FAIL] FK violations: {integrity['foreign_key_violations']}")
+        if fts_ok:
+            typer.echo("[OK] FTS5 index integrity passed")
+        else:
+            typer.echo(f"[FAIL] FTS5 integrity: {fts_status}")
         if orphaned_files:
             typer.echo(f"[WARN] {len(orphaned_files)} orphaned files on disk")
             for f in orphaned_files[:5]:
@@ -302,7 +307,7 @@ def doctor(
         else:
             typer.echo("[OK] No orphaned files")
 
-    if not integrity["ok"]:
+    if not all_ok:
         raise typer.Exit(1)
 
 
@@ -720,15 +725,10 @@ def type_list(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """List all object types."""
-    from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
 
     with _db_session() as conn:
-        rows = conn.execute(
-            """SELECT id, title, summary FROM objects WHERE type_id = ? ORDER BY title""",
-            (BOOTSTRAP_IDS["type"],),
-        ).fetchall()
-
-    types = [dict(r) for r in rows]
+        types = ObjectRepo(conn).list_types()
 
     if json_output:
         typer.echo(json.dumps(types, indent=2))
@@ -774,15 +774,10 @@ def space_list(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """List all spaces (shows hierarchy)."""
-    from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
 
     with _db_session() as conn:
-        rows = conn.execute(
-            """SELECT id, title, summary FROM objects WHERE type_id = ? ORDER BY summary, title""",
-            (BOOTSTRAP_IDS["space"],),
-        ).fetchall()
-
-    spaces = [dict(r) for r in rows]
+        spaces = ObjectRepo(conn).list_spaces()
 
     if json_output:
         typer.echo(json.dumps(spaces, indent=2))
@@ -810,11 +805,8 @@ def space_create(
         created = []
         for i in range(len(parts)):
             partial = "/".join(parts[: i + 1])
-            # Check if exists
-            existing = conn.execute(
-                "SELECT id FROM objects WHERE type_id = ? AND LOWER(summary) = ?",
-                (BOOTSTRAP_IDS["space"], partial.lower()),
-            ).fetchone()
+            # Check if exists via repository
+            existing = obj_repo.resolve_space_by_name(partial)
             if not existing:
                 display_title = parts[i].replace("-", " ").title()
                 obj = obj_repo.create(

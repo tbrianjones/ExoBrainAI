@@ -172,6 +172,32 @@ Indexes on: `objects.type_id`, `objects.space_id`, `objects.created_at`, `object
 
 12. **MUST** store the database file and `files/` directory under `$EXOBRAIN_DATA_DIR`. This directory is the canonical data location. Derived data (GraphRAG indexes, caches, logs) belongs in `$EXOBRAIN_CACHE_DIR`.
 
+13. **MUST** escape LIKE wildcard characters (%, _, \) in user-provided values used in LIKE clauses. Use the `_escape_like()` function from `repository.py` and include `ESCAPE '\'` in the SQL. This prevents accidental wildcard injection in prefix-matching queries.
+
+14. **MUST** validate file paths in FileRepo operations using `_validate_path()` to ensure paths resolve within `files_dir`. This prevents path traversal attacks where a crafted path could escape the file storage directory.
+
+15. **SHOULD** exclude bootstrap objects (types, spaces, tags) from FTS5 search results. Users searching for content should not see system infrastructure objects. The `search()` method filters by `type_id NOT IN (...)` to skip bootstrap type definitions.
+
+## Future Work
+
+These items were identified during review but are not critical for the current single-user system. They should be addressed when the relevant area is next modified.
+
+**Transaction model.** Every repository method calls `conn.commit()` independently. Multi-step operations like `capture` (create object + add tags + attach file) use a compensating delete on failure rather than a true transaction rollback. This works but is fragile. A future improvement would add a `unit_of_work` context manager that defers commit until all steps succeed, giving true atomicity. The current auto-commit model should be documented as an explicit design choice until then.
+
+**FTS5 improvements.** Three enhancements would improve search quality: (1) Add `tokenize='porter unicode61'` for stemmed search (finding "computing" when searching "compute"); (2) Use `bm25(10.0, 5.0, 1.0)` weighted ranking so title matches rank higher than content matches; (3) Add a composite index `(type_id, created_at DESC)` for the common list-by-type query. These require migration v3.
+
+**FTS5 rowid fragility.** The FTS5 table uses `content_rowid='rowid'`, linking to SQLite's implicit rowid on the `objects` table. `VACUUM` can reassign rowids, breaking FTS5 sync. Mitigation: add `WITHOUT ROWID` to the objects table (requires making `id TEXT PRIMARY KEY` explicit, which it already is) or avoid `VACUUM` in favor of `PRAGMA incremental_vacuum`. This is low risk since the `id` column is already the primary key and SQLite uses it as the rowid alias.
+
+**`_split_sql` limitations.** The migration SQL parser handles `BEGIN...END` blocks but cannot handle semicolons inside SQL string literals or `CASE...END` expressions. This has not caused problems because no current migrations use these patterns, but future migrations should avoid them or the parser should be extended.
+
+**Space hierarchy convention.** Spaces use a flat table with hierarchy encoded in the `summary` field (e.g., `work/exobrain`). The `space create` command auto-creates parents. This convention works but is not enforced at the schema level; it should be documented as an explicit design choice. A future migration could add a `parent_id` column if true hierarchical queries become necessary.
+
+**Tag normalization.** Tags are stored as-is with no normalization (no lowercasing, no trimming, no deduplication of case variants). `"Python"` and `"python"` are distinct tags. This is intentional for now; a normalization policy should be decided before the tag vocabulary grows large.
+
+**Deletion semantics for types/spaces.** Deleting a type or space object that other objects reference is blocked by foreign key constraints. The system prevents deleting bootstrap objects, but user-created types or spaces with dependents would fail silently. A future improvement could add a `--cascade` flag or a check-before-delete that reports dependents.
+
+**CORS and API authentication.** The API uses `allow_origins=["*"]` with no authentication. This is acceptable while the API is read-only and bound to localhost, but must be addressed before any write endpoints are added to the API or the system is exposed beyond localhost.
+
 ## References
 
 - PRD: `docs/archive/sqlite-base-memory-layer/20260127-exobrain-v2-sqlite-base-memory-layer-prd-chatgpt.md`

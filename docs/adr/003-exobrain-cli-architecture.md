@@ -125,13 +125,25 @@ echo "My thought" | docker compose exec -T exobrain exobrain capture
 
 8. **MUST** use the `_db_session()` context manager for all database access in CLI commands. This guarantees connection cleanup even on exceptions, preventing leaked WAL locks.
 
-9. **MUST** validate all input through Pydantic models before writing. The repository layer enforces schema constraints; the CLI layer enforces argument constraints.
+9. **SHOULD** validate input through Pydantic models where applicable. Not all CLI parameters require Pydantic validation; Typer handles basic type coercion and validation for command arguments. Pydantic models are used for structured data like JSON output schemas.
 
 10. **SHOULD** include `id`, `created_at`, and `updated_at` fields in all `--json` output for created or modified objects.
 
 11. **MUST** support `--help` on every command and subcommand. Typer generates this automatically from docstrings and type annotations.
 
 12. **SHOULD** use consistent naming conventions: singular nouns for subcommand groups (`tag`, `link`, `type`, `space`, `file`), action verbs for operations (`add`, `remove`, `list`, `create`).
+
+13. **MUST** use repository methods for all database lookups in CLI commands, including type/space resolution. Never execute raw SQL in CLI handlers. Use `ObjectRepo.resolve_type_by_name()`, `ObjectRepo.resolve_space_by_name()`, and `ObjectRepo.resolve_prefix_matches()` for name-to-ID resolution.
+
+## Future Work
+
+**JSON error output.** Rule 6 specifies that `--json` error output must include an `error` field. Currently, errors are written to stderr as plain text regardless of the `--json` flag. A future pass should wrap error paths so that `--json` produces `{"error": "message"}` on stderr with exit code 1.
+
+**GraphRAG adapter repository access.** The `stage_for_graphrag` adapter in `engine/src/graphrag/adapter.py` reads objects directly from the connection rather than going through `ObjectRepo`. This predates the v2 repository layer. When GraphRAG integration is next updated, the adapter should use repository methods for consistency.
+
+**Structured error types.** CLI commands currently raise `typer.Exit(1)` with ad-hoc error messages. A future improvement could define an `ExoError` hierarchy so that the exobrain skill can programmatically distinguish "not found" from "ambiguous prefix" from "FK constraint violation."
+
+**Link vocabulary.** Link relationships are unconstrained free text. Any string can be a relationship label. This provides flexibility but makes it harder to query or aggregate by relationship type. A future decision: should relationships be constrained to a vocabulary (like types are), or should the free-text approach continue? Document the choice when it matters.
 
 ## References
 
