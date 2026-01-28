@@ -100,7 +100,23 @@ BEGIN
 END;
 """
 
+MIGRATION_003 = """
+-- Track access for scoring (Phase 4; create table now, populate later)
+CREATE TABLE IF NOT EXISTS access_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    object_id TEXT NOT NULL REFERENCES objects(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,  -- 'read', 'write', 'search_hit'
+    timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_access_log_object_id ON access_log(object_id);
+CREATE INDEX IF NOT EXISTS idx_access_log_timestamp ON access_log(timestamp);
+
+-- Projection override flag: NULL (use score), 'always', 'never'
+ALTER TABLE objects ADD COLUMN projection_override TEXT;
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
+    (3, "Access log and projection override", MIGRATION_003),
 ]

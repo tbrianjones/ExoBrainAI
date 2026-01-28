@@ -123,7 +123,7 @@ Run via: `docker compose exec exobrain exobrain <command>`
 | `capture [CONTENT]` | Create object; `--title`, `--type`, `--space`, `--tag`, `--file` |
 | `get ID` | Full object detail with tags, links, file info |
 | `list` | Filter: `--type`, `--space`, `--tag`, `--limit`, `--offset` |
-| `update ID` | `--title`, `--summary`, `--content`, `--space` |
+| `update ID` | `--title`, `--summary`, `--content`, `--space`, `--always-project`, `--never-project`, `--auto-project` |
 | `delete ID` | Delete with confirmation (`--yes` to skip) |
 | `search QUERY` | FTS5 search across title, summary, content |
 
@@ -144,6 +144,17 @@ Run via: `docker compose exec exobrain exobrain <command>`
 | `file attach ID PATH` | Attach file to object |
 | `file detach ID` | Remove file |
 | `file path ID` | Print file path |
+
+### Projection
+
+| Command | Description |
+|---------|-------------|
+| `project` | Project objects to `$EXOBRAIN_DATA_DIR/projected/` as markdown |
+| `project --cleanup` | Recalculate scores, remove stale projections |
+| `project --dry-run` | Preview what would be projected |
+| `tier status` | Show projection statistics (counts, top scores, overrides) |
+
+Projected files have YAML frontmatter and support bidirectional sync. Edits to title, summary, content, and tags sync back to SQLite. Fields `id` and `space` are immutable.
 
 ### GraphRAG (Optional)
 

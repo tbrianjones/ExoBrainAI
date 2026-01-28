@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     # Watcher settings (legacy)
     watcher_debounce_seconds: float = 2.0
 
+    # Projection settings
+    projection_hot_limit: int = int(os.environ.get("EXOBRAIN_PROJECTION_HOT_LIMIT", "200"))
+    projection_recency_weight: float = float(
+        os.environ.get("EXOBRAIN_PROJECTION_RECENCY_WEIGHT", "0.7")
+    )
+    projection_frequency_weight: float = float(
+        os.environ.get("EXOBRAIN_PROJECTION_FREQUENCY_WEIGHT", "0.3")
+    )
+    projection_halflife_days: int = int(
+        os.environ.get("EXOBRAIN_PROJECTION_HALFLIFE_DAYS", "14")
+    )
+
     class Config:
         env_prefix = "EXOBRAIN_"
         env_file = ".env"
@@ -95,11 +107,17 @@ class Settings(BaseSettings):
         """Directory for logs (ephemeral)."""
         return self.cache_dir / "logs"
 
+    @property
+    def projected_dir(self) -> Path:
+        """Directory for projected markdown files (AI-readable views)."""
+        return self.data_dir / "projected"
+
     def ensure_dirs(self) -> None:
         """Create all required directories if they don't exist."""
         # v2 directories
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.files_dir.mkdir(parents=True, exist_ok=True)
+        self.projected_dir.mkdir(parents=True, exist_ok=True)
 
         # Legacy canonical directories
         for d in [self.raw_dir, self.overlay_dir]:

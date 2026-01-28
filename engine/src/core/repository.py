@@ -166,8 +166,13 @@ class ObjectRepo:
         summary: str | None = None,
         content: str | None = None,
         space_id: str | None = None,
+        projection_override: str | None | type(...) = ...,
     ) -> dict | None:
-        """Update an object's mutable fields. Returns updated object or None."""
+        """Update an object's mutable fields. Returns updated object or None.
+
+        Args:
+            projection_override: 'always', 'never', None (score-based), or ... (not provided)
+        """
         fields = []
         params = []
         if title is not None:
@@ -182,6 +187,9 @@ class ObjectRepo:
         if space_id is not None:
             fields.append("space_id = ?")
             params.append(space_id)
+        if projection_override is not ...:
+            fields.append("projection_override = ?")
+            params.append(projection_override)
 
         if not fields:
             return self.get(obj_id)

@@ -61,6 +61,20 @@ Run via: `docker compose exec exobrain exobrain <command>`
 | `space list` | List all spaces |
 | `space create <name>` | Create a new space (auto-creates parents for `a/b/c`) |
 
+### Projection
+
+| Command | Description |
+|---------|-------------|
+| `project` | Project top objects to `$EXOBRAIN_DATA_DIR/projected/` |
+| `project --cleanup` | Recalculate scores, remove stale projections |
+| `project --dry-run` | Preview what would be projected |
+| `tier status` | Show projection statistics |
+
+Update projection overrides:
+- `update <id> --always-project` ; Force object to always be projected
+- `update <id> --never-project` ; Force object to never be projected
+- `update <id> --auto-project` ; Use score-based projection (default)
+
 ### GraphRAG (optional)
 
 | Command | Description |

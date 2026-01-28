@@ -15,6 +15,8 @@ Use ExoBrain when you need to:
 - Tag, link, and organize knowledge objects
 - List and filter objects by type, space, or tag
 - Attach files to objects for evidence preservation
+- Browse and grep projected markdown files directly
+- Edit knowledge objects via projected files (auto-synced)
 - Query the GraphRAG index for theme or entity analysis (optional)
 
 ## CLI Commands
@@ -127,6 +129,61 @@ exobrain file path <id> --json
 exobrain file detach <id> --json
 ```
 
+### Projection
+
+Project objects to markdown files for direct AI/human access:
+
+```bash
+# Project objects to markdown files
+exobrain project --json
+
+# Preview what would be projected
+exobrain project --dry-run --json
+
+# Project and remove stale files
+exobrain project --cleanup --json
+
+# View projection tier statistics
+exobrain tier status --json
+```
+
+**Projected file location:** `$EXOBRAIN_DATA_DIR/projected/`
+
+**File format:**
+```markdown
+---
+id: 019477a3-b1c2-7def-8901-234567890abc
+type: note
+space: work/exobrain
+title: "My Document Title"
+summary: "Short description"
+tags:
+  - architecture
+  - design
+created: 2026-01-15T10:30:00Z
+updated: 2026-01-28T14:22:00Z
+---
+
+The actual content body here. Fully editable.
+```
+
+**Sync behavior:**
+- Edits to projected files automatically sync back to SQLite via watcher
+- `id` and `space` are immutable; use CLI to change
+- `title`, `summary`, `tags`, `content` are mutable
+
+**Projection override flags:**
+```bash
+# Always include in projection (even with low score)
+exobrain update <id> --always-project --json
+
+# Never include in projection (even with high score)
+exobrain update <id> --never-project --json
+
+# Use score-based projection (default)
+exobrain update <id> --auto-project --json
+```
+
 ### GraphRAG (Optional)
 
 ```bash
@@ -227,6 +284,11 @@ $EXOBRAIN_DATA_DIR/
 ├── exobrain.db        # SQLite database (source of truth)
 ├── files/             # Sharded file attachments
 │   └── 01/94/         # Two-level shard directories
+├── projected/         # AI-readable markdown projections
+│   ├── CLAUDE.md      # Root index
+│   ├── inbox/         # Default space
+│   └── work/          # User spaces
+│       └── exobrain/
 └── raw/               # Legacy v1 raw documents
 ```
 

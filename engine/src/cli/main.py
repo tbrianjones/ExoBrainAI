@@ -24,6 +24,7 @@ link_app = typer.Typer(help="Manage links between objects")
 type_app = typer.Typer(help="Manage object types")
 space_app = typer.Typer(help="Manage spaces")
 file_app = typer.Typer(help="Manage file attachments")
+tier_app = typer.Typer(help="Projection tier management")
 graphrag_app = typer.Typer(help="GraphRAG operations (optional)")
 
 app.add_typer(tag_app, name="tag")
@@ -31,6 +32,7 @@ app.add_typer(link_app, name="link")
 app.add_typer(type_app, name="type")
 app.add_typer(space_app, name="space")
 app.add_typer(file_app, name="file")
+app.add_typer(tier_app, name="tier")
 app.add_typer(graphrag_app, name="graphrag")
 
 
@@ -471,10 +473,28 @@ def update(
     summary: Optional[str] = typer.Option(None, "--summary", "-s", help="New summary"),
     content: Optional[str] = typer.Option(None, "--content", "-c", help="New content"),
     space_name: Optional[str] = typer.Option(None, "--space", help="Move to space"),
+    always_project: bool = typer.Option(False, "--always-project", help="Always include in projection"),
+    never_project: bool = typer.Option(False, "--never-project", help="Never include in projection"),
+    auto_project: bool = typer.Option(False, "--auto-project", help="Use score-based projection (default)"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """Update an object's title, summary, content, or space."""
+    """Update an object's title, summary, content, space, or projection override."""
     from src.core.repository import ObjectRepo
+
+    # Validate projection flags are mutually exclusive
+    proj_flags = [always_project, never_project, auto_project]
+    if sum(proj_flags) > 1:
+        typer.echo("Error: --always-project, --never-project, and --auto-project are mutually exclusive", err=True)
+        raise typer.Exit(1)
+
+    # Determine projection_override value (use sentinel to distinguish "not set" from "set to None")
+    projection_override = ...  # Ellipsis as sentinel for "not provided"
+    if always_project:
+        projection_override = "always"
+    elif never_project:
+        projection_override = "never"
+    elif auto_project:
+        projection_override = None  # Explicit None means "use score-based"
 
     with _db_session() as conn:
         obj_id = _resolve_id(conn, id_or_prefix)
@@ -484,7 +504,14 @@ def update(
             space_id = _resolve_space_id(conn, space_name)
 
         obj_repo = ObjectRepo(conn)
-        obj = obj_repo.update(obj_id, title=title, summary=summary, content=content, space_id=space_id)
+        obj = obj_repo.update(
+            obj_id,
+            title=title,
+            summary=summary,
+            content=content,
+            space_id=space_id,
+            projection_override=projection_override,
+        )
 
     if json_output:
         _output(obj, as_json=True)
@@ -903,6 +930,67 @@ def file_path(
         else:
             typer.echo(f"No file attached to {obj_id[:12]}", err=True)
             raise typer.Exit(1)
+
+
+# === Projection Commands ===
+
+
+@app.command()
+def project(
+    cleanup: bool = typer.Option(False, "--cleanup", help="Remove stale projections"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview what would be projected"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Project objects to markdown files for AI-readable access."""
+    from src.core.projection import run_projection_cycle
+
+    with _db_session() as conn:
+        result = run_projection_cycle(conn, cleanup=cleanup, dry_run=dry_run)
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        action = "Would project" if dry_run else "Projected"
+        typer.echo(f"{action} {result['projected']} objects to {len(result['spaces'])} spaces")
+        if result['deprojected'] > 0:
+            typer.echo(f"Deprojected {result['deprojected']} stale files")
+        if result['errors']:
+            typer.echo(f"Errors: {len(result['errors'])}", err=True)
+            for err in result['errors'][:5]:
+                typer.echo(f"  - {err}", err=True)
+
+
+@tier_app.command("status")
+def tier_status(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Show projection tier statistics."""
+    from src.core.projection import get_tier_status
+
+    with _db_session() as conn:
+        status = get_tier_status(conn)
+
+    if json_output:
+        typer.echo(json.dumps(status, indent=2))
+    else:
+        typer.echo(f"Total objects:     {status['total_objects']}")
+        typer.echo(f"Projected count:   {status['projected_count']}")
+        typer.echo(f"Hot tier limit:    {status['hot_tier_limit']}")
+        typer.echo(f"Files on disk:     {status['currently_projected_files']}")
+        typer.echo()
+        typer.echo("Top 5 by score:")
+        for obj in status['top_5_by_score']:
+            typer.echo(f"  {obj['id']}  {obj['score']:.4f}  {obj['title']}")
+        if status['always_project']:
+            typer.echo()
+            typer.echo("Always project:")
+            for obj in status['always_project']:
+                typer.echo(f"  {obj['id']}  {obj['title']}")
+        if status['never_project']:
+            typer.echo()
+            typer.echo("Never project:")
+            for obj in status['never_project']:
+                typer.echo(f"  {obj['id']}  {obj['title']}")
 
 
 # === GraphRAG Commands (Phase 6; placeholder) ===

@@ -54,6 +54,7 @@ This is explicitly a "first UI" decision, not a "only UI" decision. A web UI or 
 2. The exobrain skill translates the request into CLI commands with `--json` output
 3. Claude parses the JSON response and presents results conversationally
 4. For capture workflows, Claude generates proposed metadata (title, summary, tags) and confirms with the user before writing overlays
+5. For exploratory workflows, Claude can browse `$EXOBRAIN_DATA_DIR/projected/` directly, grepping for content and reading markdown files without CLI calls (see ADR-007)
 
 ## Consequences
 
@@ -62,6 +63,7 @@ This is explicitly a "first UI" decision, not a "only UI" decision. A web UI or 
 - **Immediate availability**: No new application to build; works today with skill files
 - **AI-augmented capture**: Claude proposes metadata that would be tedious to type manually
 - **Single environment**: Writing, ideation, and memory all happen in the same context
+- **Direct file access**: Projected markdown files (ADR-007) enable grep, browse, and direct edit without CLI latency
 - **Rapid iteration**: Updating a skill file is faster than shipping a new UI version
 - **CLI as contract**: Any future UI can use the same CLI; Claude Code is not special-cased
 

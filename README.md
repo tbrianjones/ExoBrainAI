@@ -58,9 +58,10 @@ docker compose exec exobrain exobrain capture "Design document" \
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │ CANONICAL DATA ($EXOBRAIN_DATA_DIR ; syncs via Dropbox)   │    │
 │  │                                                            │    │
-│  │  exobrain.db              files/                           │    │
-│  │  (SQLite; all objects,    ├── ab/cd/obj-id.pdf            │    │
-│  │   tags, links, FTS5)      └── ef/01/obj-id.png            │    │
+│  │  exobrain.db              files/              projected/   │    │
+│  │  (SQLite; all objects,    ├── ab/cd/...       ├── CLAUDE.md│    │
+│  │   tags, links, FTS5)      └── ef/01/...       └── space/   │    │
+│  │                                                  └── *.md  │    │
 │  └──────────────────────────────────────────────────────────┘    │
 │                              │                                     │
 │                              ▼ query / mutate                      │
@@ -159,6 +160,32 @@ docker compose exec exobrain exobrain space create "work/exobrain"
 docker compose exec exobrain exobrain status   # Object counts, DB info
 docker compose exec exobrain exobrain doctor   # Integrity check, orphan scan
 docker compose exec exobrain exobrain version
+```
+
+### Projection
+
+Project objects to markdown files for direct file access and AI-readable browsing:
+
+```bash
+# Project objects to $EXOBRAIN_DATA_DIR/projected/
+docker compose exec exobrain exobrain project
+
+# Preview without writing
+docker compose exec exobrain exobrain project --dry-run
+
+# Remove stale projections
+docker compose exec exobrain exobrain project --cleanup
+
+# View projection statistics
+docker compose exec exobrain exobrain tier status
+```
+
+Projected files are organized by space, have YAML frontmatter, and support bidirectional sync (edits sync back to SQLite). Control which objects are projected:
+
+```bash
+docker compose exec exobrain exobrain update <id> --always-project  # Force inclusion
+docker compose exec exobrain exobrain update <id> --never-project   # Force exclusion
+docker compose exec exobrain exobrain update <id> --auto-project    # Use scoring (default)
 ```
 
 ### GraphRAG (optional)
