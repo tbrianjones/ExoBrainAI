@@ -34,15 +34,18 @@ class ObjectRepo:
         summary: str | None = None,
         content: str | None = None,
         id: str | None = None,
+        source: str = "human",
     ) -> dict:
-        """Create a new object. Returns the created object as a dict."""
+        """Create a new object. Returns the created object as a dict.
+
+        Note: Does not commit; caller is responsible for transaction management.
+        """
         obj_id = id or generate_id()
         self.conn.execute(
-            """INSERT INTO objects (id, type_id, space_id, title, summary, content)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (obj_id, type_id, space_id, title, summary, content),
+            """INSERT INTO objects (id, type_id, space_id, title, summary, content, source)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (obj_id, type_id, space_id, title, summary, content, source),
         )
-        self.conn.commit()
         return self.get(obj_id)
 
     def get(self, obj_id: str) -> dict | None:
@@ -123,23 +126,12 @@ class ObjectRepo:
         conditions = []
         params = []
 
-        # Exclude bootstrap types (type, space, tag) from listings by default
-        from src.core.bootstrap import BOOTSTRAP_IDS
-
-        bootstrap_type_ids = [
-            BOOTSTRAP_IDS["type"],
-            BOOTSTRAP_IDS["space"],
-            BOOTSTRAP_IDS["tag"],
-        ]
-
         if type_name:
             conditions.append("LOWER(t.title) = ?")
             params.append(type_name.lower())
         else:
-            # Exclude system types from default listing
-            placeholders = ",".join("?" for _ in bootstrap_type_ids)
-            conditions.append(f"o.type_id NOT IN ({placeholders})")
-            params.extend(bootstrap_type_ids)
+            # Exclude system objects (types, spaces, tags) from default listing
+            conditions.append("o.is_system_object = 0")
 
         if space_name:
             conditions.append("(LOWER(s.title) = ? OR LOWER(s.summary) = ?)")
@@ -200,7 +192,7 @@ class ObjectRepo:
         self.conn.execute(
             f"UPDATE objects SET {', '.join(fields)} WHERE id = ?", params
         )
-        self.conn.commit()
+        # Note: Does not commit; caller is responsible for transaction management.
         return self.get(obj_id)
 
     def delete(self, obj_id: str) -> bool:
@@ -209,6 +201,8 @@ class ObjectRepo:
         Reads the file path first, then deletes the object (CASCADE removes
         the files DB row), then cleans up the file on disk. This ordering
         ensures the DB is consistent even if disk cleanup fails.
+
+        Note: Does not commit; caller is responsible for transaction management.
         Returns True if deleted.
         """
         # Read file path before deleting (CASCADE will remove the files row)
@@ -216,9 +210,8 @@ class ObjectRepo:
         file_info = file_repo.get(obj_id)
 
         cursor = self.conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
-        self.conn.commit()
 
-        # Clean up disk file after DB commit (with path traversal guard)
+        # Clean up disk file after DB delete (with path traversal guard)
         if file_info:
             full_path = FileRepo._validate_path(settings.files_dir / file_info["path"])
             if full_path.exists():
@@ -242,18 +235,8 @@ class ObjectRepo:
         # Quote the query to force literal matching; escape internal quotes
         safe_query = '"' + query.replace('"', '""') + '"'
 
-        # Exclude bootstrap types from search results (same as list())
-        from src.core.bootstrap import BOOTSTRAP_IDS
-
-        bootstrap_type_ids = [
-            BOOTSTRAP_IDS["type"],
-            BOOTSTRAP_IDS["space"],
-            BOOTSTRAP_IDS["tag"],
-        ]
-        placeholders = ",".join("?" for _ in bootstrap_type_ids)
-
         rows = self.conn.execute(
-            f"""SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
+            """SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
                       o.created_at, o.updated_at,
                       t.title as type_name,
                       s.title as space_name,
@@ -263,10 +246,10 @@ class ObjectRepo:
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
                WHERE objects_fts MATCH ?
-               AND o.type_id NOT IN ({placeholders})
+               AND o.is_system_object = 0
                ORDER BY rank
                LIMIT ?""",
-            (safe_query, *bootstrap_type_ids, limit),
+            (safe_query, limit),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -358,25 +341,36 @@ class TagRepo:
         self.conn = conn
 
     def add(self, object_id: str, tag_text: str, tag_object_id: str | None = None) -> bool:
-        """Add a tag to an object. Returns True if added, False if already exists."""
+        """Add a tag to an object. Returns True if added, False if already exists.
+
+        Tags are normalized to lowercase for consistent lookup.
+        Note: Does not commit; caller is responsible for transaction management.
+        """
+        # Normalize tag: lowercase and strip whitespace
+        normalized_tag = tag_text.lower().strip()
+        if not normalized_tag:
+            return False
         try:
             self.conn.execute(
                 """INSERT INTO object_tags (object_id, tag_text, tag_object_id)
                    VALUES (?, ?, ?)""",
-                (object_id, tag_text, tag_object_id),
+                (object_id, normalized_tag, tag_object_id),
             )
-            self.conn.commit()
             return True
         except sqlite3.IntegrityError:
             return False
 
     def remove(self, object_id: str, tag_text: str) -> bool:
-        """Remove a tag from an object. Returns True if removed."""
+        """Remove a tag from an object. Returns True if removed.
+
+        Note: Does not commit; caller is responsible for transaction management.
+        """
+        # Match normalized tag
+        normalized_tag = tag_text.lower().strip()
         cursor = self.conn.execute(
             "DELETE FROM object_tags WHERE object_id = ? AND tag_text = ?",
-            (object_id, tag_text),
+            (object_id, normalized_tag),
         )
-        self.conn.commit()
         return cursor.rowcount > 0
 
     def list_for_object(self, object_id: str) -> list[str]:
@@ -413,15 +407,31 @@ class LinkRepo:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
-    def create(self, from_id: str, to_id: str, relationship: str) -> dict | None:
-        """Create a link between two objects. Returns the link or None on conflict."""
+    def create(
+        self,
+        from_id: str,
+        to_id: str,
+        relationship: str,
+        source: str = "human",
+        confidence: float = 1.0,
+    ) -> dict | None:
+        """Create a link between two objects. Returns the link or None on conflict.
+
+        Args:
+            from_id: Source object ID
+            to_id: Target object ID
+            relationship: Relationship type (e.g., 'references', 'derived-from')
+            source: Link provenance ('human', 'ai', 'import', 'system')
+            confidence: Confidence score 0.0 to 1.0 (default 1.0)
+
+        Note: Does not commit; caller is responsible for transaction management.
+        """
         try:
             cursor = self.conn.execute(
-                """INSERT INTO links (from_id, to_id, relationship)
-                   VALUES (?, ?, ?)""",
-                (from_id, to_id, relationship),
+                """INSERT INTO links (from_id, to_id, relationship, source, confidence)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (from_id, to_id, relationship, source, confidence),
             )
-            self.conn.commit()
             return self.get(cursor.lastrowid)
         except sqlite3.IntegrityError:
             return None
@@ -434,9 +444,11 @@ class LinkRepo:
         return dict(row) if row else None
 
     def delete(self, link_id: int) -> bool:
-        """Delete a link by ID. Returns True if deleted."""
+        """Delete a link by ID. Returns True if deleted.
+
+        Note: Does not commit; caller is responsible for transaction management.
+        """
         cursor = self.conn.execute("DELETE FROM links WHERE id = ?", (link_id,))
-        self.conn.commit()
         return cursor.rowcount > 0
 
     def list_from(self, object_id: str) -> list[dict]:
@@ -525,11 +537,28 @@ class FileRepo:
     ) -> dict:
         """Attach a file to an object by copying it to sharded storage.
 
-        Computes SHA-256 and MIME type automatically.
+        Computes SHA-256 and MIME type automatically. If a file is already
+        attached, the old file is deleted before attaching the new one
+        to prevent orphaned files on disk.
+
+        Note: Does not commit; caller is responsible for transaction management.
         """
         source = Path(source_path)
         if not source.exists():
             raise FileNotFoundError(f"Source file not found: {source}")
+
+        # Delete existing file to prevent orphaning (fixes expert review issue)
+        existing = self.get(object_id)
+        if existing:
+            old_path = self._validate_path(settings.files_dir / existing["path"])
+            if old_path.exists():
+                old_path.unlink()
+            # Clean up empty shard directories
+            for parent in [old_path.parent, old_path.parent.parent]:
+                try:
+                    parent.rmdir()
+                except OSError:
+                    break
 
         extension = source.suffix or ""
         dest = self._sharded_path(object_id, extension)
@@ -547,7 +576,6 @@ class FileRepo:
                VALUES (?, ?, ?, ?, ?, ?)""",
             (object_id, rel_path, role, mime_type, size_bytes, sha256),
         )
-        self.conn.commit()
 
         return {
             "object_id": object_id,
@@ -559,7 +587,10 @@ class FileRepo:
         }
 
     def detach(self, object_id: str) -> bool:
-        """Remove file attachment. Deletes DB record first, then file on disk."""
+        """Remove file attachment. Deletes DB record first, then file on disk.
+
+        Note: Does not commit; caller is responsible for transaction management.
+        """
         row = self.conn.execute(
             "SELECT path FROM files WHERE object_id = ?", (object_id,)
         ).fetchone()
@@ -568,7 +599,6 @@ class FileRepo:
 
         # Delete DB record first (ensures no orphan references if disk op fails)
         self.conn.execute("DELETE FROM files WHERE object_id = ?", (object_id,))
-        self.conn.commit()
 
         # Then delete file from disk (with path traversal guard)
         full_path = self._validate_path(settings.files_dir / row["path"])

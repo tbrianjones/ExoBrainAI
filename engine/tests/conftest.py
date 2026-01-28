@@ -113,17 +113,20 @@ def sample_objects(bootstrapped_db):
         summary="A short observation",
         content="Noticed a connection between quantum and ML approaches.",
     )
+    conn.commit()
 
-    # Tags
+    # Tags (now normalized to lowercase)
     tag_repo.add(obj_a["id"], "quantum")
     tag_repo.add(obj_a["id"], "computing")
     tag_repo.add(obj_b["id"], "machine-learning")
     tag_repo.add(obj_b["id"], "computing")
     tag_repo.add(obj_c["id"], "observation")
+    conn.commit()
 
     # Links
     link_repo.create(obj_a["id"], obj_b["id"], "related-to")
     link_repo.create(obj_c["id"], obj_a["id"], "references")
+    conn.commit()
 
     return {
         "conn": conn,

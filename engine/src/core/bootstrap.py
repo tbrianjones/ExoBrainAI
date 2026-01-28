@@ -20,11 +20,16 @@ BOOTSTRAP_IDS = {
     "transcript": "00000000-0000-7000-8000-000000000005",
     "note": "00000000-0000-7000-8000-000000000006",
     "url": "00000000-0000-7000-8000-000000000007",
+    "person": "00000000-0000-7000-8000-000000000008",
+    "project": "00000000-0000-7000-8000-000000000009",
+    "event": "00000000-0000-7000-8000-00000000000a",
+    "concept": "00000000-0000-7000-8000-00000000000b",
     # Spaces
     "primitives": "00000000-0000-7000-8000-000000000101",
     "primitives/type": "00000000-0000-7000-8000-000000000102",
     "primitives/space": "00000000-0000-7000-8000-000000000103",
     "primitives/tag": "00000000-0000-7000-8000-000000000104",
+    "primitives/relationship": "00000000-0000-7000-8000-000000000105",
     "inbox": "00000000-0000-7000-8000-000000000201",
 }
 
@@ -37,6 +42,10 @@ BOOTSTRAP_TYPES = [
     ("transcript", "Transcript", "Conversation or interview transcript"),
     ("note", "Note", "Short thought or observation"),
     ("url", "URL", "Web resource reference"),
+    ("person", "Person", "Contact, author, or speaker reference"),
+    ("project", "Project", "Bounded initiative with defined scope"),
+    ("event", "Event", "Time-bounded occurrence like meeting or conference"),
+    ("concept", "Concept", "Abstract idea or term definition"),
 ]
 
 # Initial space definitions
@@ -45,7 +54,21 @@ BOOTSTRAP_SPACES = [
     ("primitives/type", "Types", "Type definitions"),
     ("primitives/space", "Spaces", "Space definitions"),
     ("primitives/tag", "Tags", "Tag definitions"),
+    ("primitives/relationship", "Relationships", "Standard relationship type vocabulary"),
     ("inbox", "Inbox", "Default space for user captures"),
+]
+
+# Standard relationship vocabulary for use with links
+# Each is (relationship_name, inverse_name, description)
+RELATIONSHIP_VOCABULARY = [
+    ("references", "referenced-by", "Citation or mention"),
+    ("derived-from", "source-of", "Content provenance chain"),
+    ("supersedes", "superseded-by", "Version replacement"),
+    ("related-to", "related-to", "Symmetric association"),
+    ("part-of", "contains", "Composition hierarchy"),
+    ("broader-than", "narrower-than", "Taxonomic hierarchy"),
+    ("responds-to", "has-response", "Q&A or reply chain"),
+    ("blocks", "blocked-by", "Dependency relationship"),
 ]
 
 
@@ -75,8 +98,8 @@ def bootstrap(conn: sqlite3.Connection) -> dict:
         for key, title, summary in BOOTSTRAP_TYPES:
             obj_id = BOOTSTRAP_IDS[key]
             cursor = conn.execute(
-                """INSERT OR IGNORE INTO objects (id, type_id, space_id, title, summary)
-                   VALUES (?, ?, ?, ?, ?)""",
+                """INSERT OR IGNORE INTO objects (id, type_id, space_id, title, summary, source, is_system_object)
+                   VALUES (?, ?, ?, ?, ?, 'system', 1)""",
                 (obj_id, type_type_id, primitives_type_space, title, summary),
             )
             types_created += cursor.rowcount
@@ -85,11 +108,19 @@ def bootstrap(conn: sqlite3.Connection) -> dict:
         for key, title, summary in BOOTSTRAP_SPACES:
             obj_id = BOOTSTRAP_IDS[key]
             cursor = conn.execute(
-                """INSERT OR IGNORE INTO objects (id, type_id, space_id, title, summary)
-                   VALUES (?, ?, ?, ?, ?)""",
+                """INSERT OR IGNORE INTO objects (id, type_id, space_id, title, summary, source, is_system_object)
+                   VALUES (?, ?, ?, ?, ?, 'system', 1)""",
                 (obj_id, space_type_id, primitives_space_space, title, summary),
             )
             spaces_created += cursor.rowcount
+
+        # 3. Mark existing bootstrap objects as system (for upgrades)
+        all_bootstrap_ids = list(BOOTSTRAP_IDS.values())
+        placeholders = ",".join("?" for _ in all_bootstrap_ids)
+        conn.execute(
+            f"UPDATE objects SET is_system_object = 1, source = 'system' WHERE id IN ({placeholders})",
+            all_bootstrap_ids,
+        )
 
         conn.commit()
     except Exception:

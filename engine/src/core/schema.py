@@ -115,8 +115,33 @@ CREATE INDEX IF NOT EXISTS idx_access_log_timestamp ON access_log(timestamp);
 ALTER TABLE objects ADD COLUMN projection_override TEXT;
 """
 
+MIGRATION_004 = """
+-- Performance: Index for projection scoring ORDER BY updated_at DESC
+CREATE INDEX IF NOT EXISTS idx_objects_updated_at ON objects(updated_at);
+
+-- Composite index for common query pattern: filter by type, order by created
+CREATE INDEX IF NOT EXISTS idx_objects_type_created ON objects(type_id, created_at DESC);
+
+-- Provenance: Track where content came from
+-- Values: 'human' (user created), 'ai' (LLM generated), 'import' (external), 'system' (bootstrap)
+ALTER TABLE objects ADD COLUMN source TEXT DEFAULT 'human';
+
+-- Lifecycle: Object status for draft/archive workflows
+-- Values: 'active' (default), 'draft', 'archived', 'deprecated'
+ALTER TABLE objects ADD COLUMN status TEXT DEFAULT 'active';
+
+-- System marker: Replace hardcoded bootstrap ID checks with queryable column
+-- Set to 1 for all bootstrap objects (types, spaces, tags in primitives/)
+ALTER TABLE objects ADD COLUMN is_system_object INTEGER DEFAULT 0;
+
+-- Link metadata: Track provenance and confidence of relationships
+ALTER TABLE links ADD COLUMN source TEXT DEFAULT 'human';
+ALTER TABLE links ADD COLUMN confidence REAL DEFAULT 1.0;
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
     (3, "Access log and projection override", MIGRATION_003),
+    (4, "Performance indexes, source, status, is_system_object, link metadata", MIGRATION_004),
 ]

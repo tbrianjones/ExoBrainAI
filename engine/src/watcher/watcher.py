@@ -159,7 +159,7 @@ class ProjectionHandler(FileSystemEventHandler):
     def _process_pending(self):
         """Process all pending file changes."""
         # Import here to avoid circular imports
-        from src.core.db import get_connection
+        from src.core.db import db_session
         from src.core.projection import sync_from_file
 
         with self._lock:
@@ -184,7 +184,7 @@ class ProjectionHandler(FileSystemEventHandler):
                     continue
 
                 logger.info(f"Syncing projected file: {file_path}")
-                with get_connection() as conn:
+                with db_session() as conn:
                     result = sync_from_file(conn, file_path)
 
                 if result.success:

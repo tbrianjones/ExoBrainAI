@@ -10,14 +10,27 @@ router = APIRouter()
 
 @router.get("/health")
 async def health():
-    """Health check endpoint."""
-    return {"status": "ok", "version": __version__}
+    """Health check endpoint.
+
+    Returns basic health status for Docker health checks and monitoring.
+    """
+    from src.core.db import get_db_path
+
+    db_exists = get_db_path().exists()
+    projected_dir_exists = settings.projected_dir.exists()
+
+    return {
+        "status": "ok" if db_exists else "degraded",
+        "version": __version__,
+        "db_exists": db_exists,
+        "projected_dir_exists": projected_dir_exists,
+    }
 
 
 @router.get("/status")
 async def status():
-    """Get ExoBrain status."""
-    from src.core.db import check_integrity, get_connection, get_db_path
+    """Get comprehensive ExoBrain status."""
+    from src.core.db import check_integrity, db_session, get_db_path
     from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
 
     result = {
@@ -28,8 +41,7 @@ async def status():
     # SQLite v2 data
     db_path = get_db_path()
     if db_path.exists():
-        conn = get_connection(db_path)
-        try:
+        with db_session(db_path) as conn:
             obj_repo = ObjectRepo(conn)
             tag_repo = TagRepo(conn)
             link_repo = LinkRepo(conn)
@@ -45,8 +57,19 @@ async def status():
                 "files": file_repo.count(),
                 "integrity": "ok" if integrity["ok"] else "failed",
             }
-        finally:
-            conn.close()
+
+            # Projection status
+            try:
+                from src.core.projection import get_tier_status
+                tier_status = get_tier_status(conn)
+                result["projection"] = {
+                    "total_objects": tier_status["total_objects"],
+                    "projected_count": tier_status["projected_count"],
+                    "hot_tier_limit": tier_status["hot_tier_limit"],
+                    "files_on_disk": tier_status["currently_projected_files"],
+                }
+            except Exception:
+                result["projection"] = {"status": "error"}
 
     # Legacy data
     raw_count = len(list(settings.raw_dir.glob("*.md"))) if settings.raw_dir.exists() else 0

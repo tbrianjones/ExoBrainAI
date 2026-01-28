@@ -6,8 +6,10 @@ Projects SQLite objects as markdown files with YAML frontmatter for AI-readable 
 from __future__ import annotations
 
 import math
+import os
 import re
 import sqlite3
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +20,10 @@ import yaml
 from src.config import settings
 from src.core.bootstrap import BOOTSTRAP_IDS
 from src.core.repository import ObjectRepo, TagRepo
+
+
+# Valid values for projection_override field
+VALID_PROJECTION_OVERRIDES = {None, "always", "never"}
 
 
 class ProjectionResult(NamedTuple):
@@ -45,6 +51,46 @@ class ObjectScore:
     space_name: str
     score: float
     projection_override: str | None
+
+
+def _atomic_write(file_path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Write content to file atomically using temp file + rename.
+
+    This prevents partial writes that could corrupt files on crash.
+    """
+    # Ensure directory exists and is writable
+    dir_path = file_path.parent
+    if not os.access(dir_path, os.W_OK):
+        raise PermissionError(f"Cannot write to directory: {dir_path}")
+
+    # Write to temp file in same directory (ensures same filesystem for rename)
+    fd, temp_path = tempfile.mkstemp(dir=str(dir_path), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding=encoding) as f:
+            f.write(content)
+        # Atomic rename (POSIX guarantees this is atomic on same filesystem)
+        os.replace(temp_path, file_path)
+    except Exception:
+        # Clean up temp file on failure
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _validate_path_in_projected_dir(file_path: Path) -> bool:
+    """Validate that a resolved path stays inside the projected directory.
+
+    Prevents symlink attacks where a file inside projected/ could be a symlink
+    pointing outside, causing us to read/write arbitrary files.
+    """
+    try:
+        resolved = file_path.resolve()
+        projected_root = settings.projected_dir.resolve()
+        return str(resolved).startswith(str(projected_root) + os.sep) or resolved == projected_root
+    except (OSError, ValueError):
+        return False
 
 
 def _slugify(text: str, max_length: int = 50) -> str:
@@ -224,7 +270,16 @@ def project_object(conn: sqlite3.Connection, obj_id: str) -> ProjectionResult:
     dir_path.mkdir(parents=True, exist_ok=True)
 
     file_path = dir_path / filename
-    file_path.write_text(file_content, encoding="utf-8")
+
+    # Validate path stays inside projected directory (symlink protection)
+    if not _validate_path_in_projected_dir(file_path):
+        return ProjectionResult(False, f"Path validation failed: {file_path}")
+
+    # Write atomically to prevent corruption on crash
+    try:
+        _atomic_write(file_path, file_content)
+    except PermissionError as e:
+        return ProjectionResult(False, str(e))
 
     return ProjectionResult(True, f"Projected to {file_path}", file_path)
 
@@ -306,11 +361,13 @@ def generate_claude_md(conn: sqlite3.Connection, space_path: str) -> str:
 
 
 def _write_claude_md_for_space(conn: sqlite3.Connection, space_path: str) -> None:
-    """Write CLAUDE.md file for a space directory."""
+    """Write CLAUDE.md file for a space directory using atomic write."""
     content = generate_claude_md(conn, space_path)
     dir_path = settings.projected_dir / space_path
     dir_path.mkdir(parents=True, exist_ok=True)
-    (dir_path / "CLAUDE.md").write_text(content, encoding="utf-8")
+    file_path = dir_path / "CLAUDE.md"
+    if _validate_path_in_projected_dir(file_path):
+        _atomic_write(file_path, content)
 
 
 def _generate_root_claude_md(conn: sqlite3.Connection, projected_spaces: set[str]) -> str:
@@ -397,6 +454,16 @@ def run_projection_cycle(
             if md_file.name == "CLAUDE.md":
                 continue
 
+            # Validate path stays inside projected directory (symlink protection)
+            if not _validate_path_in_projected_dir(md_file):
+                errors.append(f"Skipping file outside projected dir: {md_file}")
+                continue
+
+            # Skip if it's not a regular file (e.g., symlink to outside)
+            if not md_file.is_file() or md_file.is_symlink():
+                errors.append(f"Skipping non-regular file: {md_file}")
+                continue
+
             # Read the file and extract ID from frontmatter
             try:
                 content = md_file.read_text(encoding="utf-8")
@@ -421,9 +488,10 @@ def run_projection_cycle(
         for space_path in projected_spaces:
             _write_claude_md_for_space(conn, space_path)
 
-        # Root CLAUDE.md
+        # Root CLAUDE.md (atomic write)
         root_content = _generate_root_claude_md(conn, projected_spaces)
-        (settings.projected_dir / "CLAUDE.md").write_text(root_content, encoding="utf-8")
+        root_file = settings.projected_dir / "CLAUDE.md"
+        _atomic_write(root_file, root_content)
 
     return {
         "projected": projected_count,
@@ -506,6 +574,14 @@ def sync_from_file(conn: sqlite3.Connection, file_path: Path) -> SyncResult:
     summary = frontmatter.get("summary")
     projection_override = frontmatter.get("projection_override")
 
+    # Validate projection_override value
+    if projection_override not in VALID_PROJECTION_OVERRIDES:
+        return SyncResult(
+            False,
+            f"Invalid projection_override value: '{projection_override}'. Must be 'always', 'never', or null.",
+            obj_id,
+        )
+
     # Update the object
     try:
         obj_repo.update(
@@ -531,6 +607,9 @@ def sync_from_file(conn: sqlite3.Connection, file_path: Path) -> SyncResult:
         # Remove old tags
         for tag in existing_tags - new_tags:
             tag_repo.remove(obj_id, tag)
+
+    # Commit the transaction
+    conn.commit()
 
     return SyncResult(True, f"Synced {obj_id}", obj_id)
 

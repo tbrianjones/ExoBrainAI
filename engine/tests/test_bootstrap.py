@@ -18,15 +18,17 @@ from src.core.db import check_integrity
 class TestBootstrapCreation:
     """Test that bootstrap creates the expected types and spaces."""
 
-    def test_creates_seven_types(self, db_conn):
+    def test_creates_eleven_types(self, db_conn):
         result = bootstrap(db_conn)
-        assert result["types_created"] == 7
-        assert len(BOOTSTRAP_TYPES) == 7
+        # 7 original + 4 new (person, project, event, concept)
+        assert result["types_created"] == 11
+        assert len(BOOTSTRAP_TYPES) == 11
 
-    def test_creates_five_spaces(self, db_conn):
+    def test_creates_six_spaces(self, db_conn):
         result = bootstrap(db_conn)
-        assert result["spaces_created"] == 5
-        assert len(BOOTSTRAP_SPACES) == 5
+        # 5 original + 1 new (primitives/relationship)
+        assert result["spaces_created"] == 6
+        assert len(BOOTSTRAP_SPACES) == 6
 
     def test_total_bootstrap_objects(self, db_conn):
         result = bootstrap(db_conn)
@@ -57,9 +59,9 @@ class TestBootstrapIdempotency:
     def test_idempotent_second_run_creates_nothing(self, db_conn):
         first = bootstrap(db_conn)
         second = bootstrap(db_conn)
-        assert first["types_created"] == 7
+        assert first["types_created"] == 11
         assert second["types_created"] == 0
-        assert first["spaces_created"] == 5
+        assert first["spaces_created"] == 6
         assert second["spaces_created"] == 0
 
     def test_idempotent_object_count_unchanged(self, db_conn):
@@ -127,3 +129,64 @@ class TestBootstrapForeignKeyEnforcement:
                 "INSERT INTO objects (id, type_id, space_id, title) VALUES (?, ?, ?, ?)",
                 ("test-bad-fk", "nonexistent-type", "nonexistent-space", "Bad FK"),
             )
+
+
+class TestNewBootstrapTypes:
+    """Test the new bootstrap types added in Migration 4."""
+
+    def test_person_type_exists(self, bootstrapped_db):
+        row = bootstrapped_db.execute(
+            "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["person"],)
+        ).fetchone()
+        assert row is not None
+        assert row["title"] == "Person"
+
+    def test_project_type_exists(self, bootstrapped_db):
+        row = bootstrapped_db.execute(
+            "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["project"],)
+        ).fetchone()
+        assert row is not None
+        assert row["title"] == "Project"
+
+    def test_event_type_exists(self, bootstrapped_db):
+        row = bootstrapped_db.execute(
+            "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["event"],)
+        ).fetchone()
+        assert row is not None
+        assert row["title"] == "Event"
+
+    def test_concept_type_exists(self, bootstrapped_db):
+        row = bootstrapped_db.execute(
+            "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["concept"],)
+        ).fetchone()
+        assert row is not None
+        assert row["title"] == "Concept"
+
+    def test_relationship_space_exists(self, bootstrapped_db):
+        row = bootstrapped_db.execute(
+            "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["primitives/relationship"],)
+        ).fetchone()
+        assert row is not None
+        assert row["title"] == "Relationships"
+
+
+class TestBootstrapSystemMarker:
+    """Test that bootstrap objects are marked as system objects."""
+
+    def test_bootstrap_objects_have_source_system(self, bootstrapped_db):
+        """All bootstrap objects should have source='system'."""
+        for obj_id in BOOTSTRAP_IDS.values():
+            row = bootstrapped_db.execute(
+                "SELECT source FROM objects WHERE id = ?", (obj_id,)
+            ).fetchone()
+            assert row is not None
+            assert row["source"] == "system"
+
+    def test_bootstrap_objects_marked_as_system(self, bootstrapped_db):
+        """All bootstrap objects should have is_system_object=1."""
+        for obj_id in BOOTSTRAP_IDS.values():
+            row = bootstrapped_db.execute(
+                "SELECT is_system_object FROM objects WHERE id = ?", (obj_id,)
+            ).fetchone()
+            assert row is not None
+            assert row["is_system_object"] == 1

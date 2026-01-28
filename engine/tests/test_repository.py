@@ -989,3 +989,194 @@ class TestFileRepoReplacement:
         full_path = repo.get_full_path(obj_id)
         assert full_path.read_text() == "Second attachment"
         assert result2["sha256"] != result1["sha256"]
+
+    def test_attach_replaces_cleans_old_file(self, sample_objects, _patched_settings):
+        """Test that old file is deleted when attaching a new file."""
+        conn = sample_objects["conn"]
+        repo = FileRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        # Attach first file
+        source1 = _patched_settings.data_dir / "first.txt"
+        source1.write_text("First attachment")
+        result1 = repo.attach(obj_id, source1)
+        first_path = _patched_settings.files_dir / result1["path"]
+        assert first_path.exists()
+
+        # Attach second file with different extension
+        source2 = _patched_settings.data_dir / "second.json"
+        source2.write_text('{"key": "value"}')
+        result2 = repo.attach(obj_id, source2)
+
+        # Old file should be deleted
+        assert not first_path.exists(), "Old file should be deleted on replace"
+
+        # New file should exist
+        new_path = _patched_settings.files_dir / result2["path"]
+        assert new_path.exists()
+
+
+class TestTagNormalization:
+    """Test that tags are normalized (lowercase)."""
+
+    def test_add_normalizes_to_lowercase(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = TagRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        repo.add(obj_id, "UPPERCASE")
+        conn.commit()
+
+        tags = repo.list_for_object(obj_id)
+        assert "uppercase" in tags
+        assert "UPPERCASE" not in tags
+
+    def test_add_normalizes_mixed_case(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = TagRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        repo.add(obj_id, "MixedCase")
+        conn.commit()
+
+        tags = repo.list_for_object(obj_id)
+        assert "mixedcase" in tags
+
+    def test_add_trims_whitespace(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = TagRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        repo.add(obj_id, "  padded  ")
+        conn.commit()
+
+        tags = repo.list_for_object(obj_id)
+        assert "padded" in tags
+
+    def test_remove_normalizes_query(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = TagRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        # Add lowercase tag
+        repo.add(obj_id, "newtag")
+        conn.commit()
+
+        # Remove with uppercase (should still match)
+        result = repo.remove(obj_id, "NEWTAG")
+        conn.commit()
+
+        assert result is True
+        tags = repo.list_for_object(obj_id)
+        assert "newtag" not in tags
+
+    def test_add_empty_tag_returns_false(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = TagRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        result = repo.add(obj_id, "   ")
+        assert result is False
+
+    def test_duplicate_with_different_case_returns_false(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = TagRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        # Add lowercase
+        result1 = repo.add(obj_id, "mytag")
+        conn.commit()
+
+        # Try to add uppercase version (should fail as duplicate)
+        result2 = repo.add(obj_id, "MYTAG")
+
+        assert result1 is True
+        assert result2 is False
+
+
+class TestObjectSourceField:
+    """Test the new source field for object provenance."""
+
+    def test_create_default_source_is_human(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Default Source Test",
+        )
+        bootstrapped_db.commit()
+
+        row = bootstrapped_db.execute(
+            "SELECT source FROM objects WHERE id = ?", (obj["id"],)
+        ).fetchone()
+        assert row["source"] == "human"
+
+    def test_create_with_explicit_source(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="AI Generated",
+            source="ai",
+        )
+        bootstrapped_db.commit()
+
+        row = bootstrapped_db.execute(
+            "SELECT source FROM objects WHERE id = ?", (obj["id"],)
+        ).fetchone()
+        assert row["source"] == "ai"
+
+    def test_create_with_import_source(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Imported Content",
+            source="import",
+        )
+        bootstrapped_db.commit()
+
+        row = bootstrapped_db.execute(
+            "SELECT source FROM objects WHERE id = ?", (obj["id"],)
+        ).fetchone()
+        assert row["source"] == "import"
+
+
+class TestLinkMetadata:
+    """Test link source and confidence fields."""
+
+    def test_create_link_default_source(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = LinkRepo(conn)
+
+        link = repo.create(
+            sample_objects["obj_a"]["id"],
+            sample_objects["obj_c"]["id"],
+            "new-relationship",
+        )
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT source, confidence FROM links WHERE id = ?", (link["id"],)
+        ).fetchone()
+        assert row["source"] == "human"
+        assert row["confidence"] == 1.0
+
+    def test_create_link_with_ai_source(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = LinkRepo(conn)
+
+        link = repo.create(
+            sample_objects["obj_b"]["id"],
+            sample_objects["obj_c"]["id"],
+            "ai-suggested",
+            source="ai",
+            confidence=0.85,
+        )
+        conn.commit()
+
+        row = conn.execute(
+            "SELECT source, confidence FROM links WHERE id = ?", (link["id"],)
+        ).fetchone()
+        assert row["source"] == "ai"
+        assert row["confidence"] == 0.85

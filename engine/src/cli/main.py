@@ -85,12 +85,21 @@ def _get_db():
 
 @contextmanager
 def _db_session():
-    """Context manager that opens and guarantees closing of a DB connection."""
-    conn = _get_db()
-    try:
+    """Context manager that opens and guarantees closing of a DB connection.
+
+    Note: This wraps the shared db_session from db.py with CLI-specific
+    error handling for when the database doesn't exist.
+    """
+    from src.core.db import get_db_path
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        typer.echo("Database not found. Run 'exobrain init' first.", err=True)
+        raise typer.Exit(1)
+
+    from src.core.db import db_session
+    with db_session(db_path) as conn:
         yield conn
-    finally:
-        conn.close()
 
 
 def _resolve_id(conn, id_or_prefix: str) -> str:
@@ -375,9 +384,14 @@ def capture(
             if file_path:
                 file_repo = FileRepo(conn)
                 file_repo.attach(obj["id"], file_path)
+
+            # Commit the entire transaction
+            conn.commit()
         except Exception:
             # Roll back the entire capture on failure
+            conn.rollback()
             obj_repo.delete(obj["id"])
+            conn.commit()
             raise
 
         # Re-fetch with all data
@@ -512,6 +526,7 @@ def update(
             space_id=space_id,
             projection_override=projection_override,
         )
+        conn.commit()
 
     if json_output:
         _output(obj, as_json=True)
@@ -547,6 +562,7 @@ def delete(
 
         # ObjectRepo.delete() handles CASCADE + disk cleanup
         deleted = obj_repo.delete(obj_id)
+        conn.commit()
 
     result = {"id": obj_id, "deleted": deleted, "title": obj["title"]}
 
@@ -606,8 +622,9 @@ def tag_add(
         obj_id = _resolve_id(conn, id_or_prefix)
         tag_repo = TagRepo(conn)
         added = tag_repo.add(obj_id, tag_text)
+        conn.commit()
 
-    result = {"object_id": obj_id, "tag": tag_text, "added": added}
+    result = {"object_id": obj_id, "tag": tag_text.lower().strip(), "added": added}
 
     if json_output:
         typer.echo(json.dumps(result, indent=2))
@@ -631,8 +648,9 @@ def tag_remove(
         obj_id = _resolve_id(conn, id_or_prefix)
         tag_repo = TagRepo(conn)
         removed = tag_repo.remove(obj_id, tag_text)
+        conn.commit()
 
-    result = {"object_id": obj_id, "tag": tag_text, "removed": removed}
+    result = {"object_id": obj_id, "tag": tag_text.lower().strip(), "removed": removed}
 
     if json_output:
         typer.echo(json.dumps(result, indent=2))
@@ -684,6 +702,7 @@ def link_create(
 
         link_repo = LinkRepo(conn)
         link = link_repo.create(from_id, to_id, relationship)
+        conn.commit()
 
     if json_output:
         typer.echo(json.dumps(link, indent=2, default=str))
@@ -732,6 +751,7 @@ def link_remove(
     with _db_session() as conn:
         link_repo = LinkRepo(conn)
         deleted = link_repo.delete(link_id)
+        conn.commit()
 
     result = {"link_id": link_id, "deleted": deleted}
 
@@ -785,7 +805,9 @@ def type_create(
             space_id=BOOTSTRAP_IDS["primitives/type"],
             title=display_name,
             summary=summary,
+            source="human",
         )
+        conn.commit()
 
     if json_output:
         _output(obj, as_json=True)
@@ -841,8 +863,10 @@ def space_create(
                     space_id=BOOTSTRAP_IDS["primitives/space"],
                     title=display_title,
                     summary=partial,
+                    source="human",
                 )
                 created.append({"name": partial, "id": obj["id"]})
+        conn.commit()
 
     if json_output:
         typer.echo(json.dumps(created, indent=2))
@@ -873,6 +897,7 @@ def file_attach(
 
         try:
             result = file_repo.attach(obj_id, path, role=role)
+            conn.commit()
         except FileNotFoundError as e:
             typer.echo(str(e), err=True)
             raise typer.Exit(1)
@@ -897,6 +922,7 @@ def file_detach(
         obj_id = _resolve_id(conn, id_or_prefix)
         file_repo = FileRepo(conn)
         removed = file_repo.detach(obj_id)
+        conn.commit()
 
     result = {"object_id": obj_id, "detached": removed}
 

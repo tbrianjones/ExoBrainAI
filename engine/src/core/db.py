@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Generator
 
 from src.config import settings
 
@@ -83,6 +85,26 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
+
+
+@contextmanager
+def db_session(db_path: Path | None = None) -> Generator[sqlite3.Connection, None, None]:
+    """Context manager for database sessions.
+
+    Opens a connection and guarantees it will be closed, even on error.
+    Does NOT auto-commit; callers must explicitly commit.
+
+    Usage:
+        with db_session() as conn:
+            repo = ObjectRepo(conn)
+            repo.create(...)
+            conn.commit()
+    """
+    conn = get_connection(db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def run_migrations(conn: sqlite3.Connection) -> list[int]:
