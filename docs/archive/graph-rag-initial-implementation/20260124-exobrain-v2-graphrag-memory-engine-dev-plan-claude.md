@@ -12,7 +12,7 @@ related-adrs: []
 
 ## Summary
 
-Transform the claude_writer repository into a Docker-based local-first memory engine with GraphRAG-powered retrieval. Raw documents live in an external folder (Dropbox-backed), annotations accumulate in overlay JSONL, and staged documents feed GraphRAG indexing. Claude Code commands/agents become the first "integration" consuming this memory layer.
+Transform the ExoBrain repository into a Docker-based local-first memory engine with GraphRAG-powered retrieval. Raw documents live in an external folder (Dropbox-backed), annotations accumulate in overlay JSONL, and staged documents feed GraphRAG indexing. Claude Code commands/agents become the first "integration" consuming this memory layer.
 
 ## Agent Quick Start
 

@@ -1,9 +1,6 @@
-# Claude Writer + ExoBrain
+# ExoBrain
 
-Two-layer personal knowledge system:
-
-1. **ExoBrain** ; SQLite-backed knowledge engine (everything is an object)
-2. **Claude Writer** ; Ideation and content generation (Claude Code commands)
+Personal knowledge system with SQLite-backed storage (everything is an object) and Claude Code commands for ideation and content generation.
 
 ## ExoBrain Quick Reference
 

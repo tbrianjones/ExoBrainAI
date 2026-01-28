@@ -1,6 +1,6 @@
 # Quarto Post Framework
 
-Reference documentation for creating Quarto documents in the claude_writer system.
+Reference documentation for creating Quarto documents in the ExoBrain system.
 
 ## What is Quarto?
 

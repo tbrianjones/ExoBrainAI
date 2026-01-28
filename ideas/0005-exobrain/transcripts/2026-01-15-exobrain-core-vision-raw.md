@@ -1,4 +1,7 @@
 # Full Transcript: ExoBrain Core Vision
+
+> **Note**: This transcript references "Claude Writer," which was the original working name for this project. It has since been renamed to **ExoBrain**.
+
 - person: Brian
 - ai: claude-sonnet-4-5-20250929
 - date: 2026-01-15

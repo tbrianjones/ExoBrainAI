@@ -1,5 +1,7 @@
 # Research Report: AI-Powered Content Creation Landscape
 
+> **Note**: This transcript references "Claude Writer," which was the original working name for this project. It has since been renamed to **ExoBrain**.
+
 - researcher: Claude Opus 4.5
 - date: 2026-01-10
 - purpose: Survey open source projects and patterns for agent-driven content production systems

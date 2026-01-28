@@ -1,9 +1,6 @@
-# ExoBrain + Claude Writer
+# ExoBrain
 
-A local-first personal knowledge system with two layers:
-
-1. **ExoBrain** ; SQLite-backed memory engine where everything is an object
-2. **Claude Writer** ; AI-assisted ideation and content generation through Claude Code
+A local-first personal knowledge system with SQLite-backed storage where everything is an object. Includes AI-assisted ideation and content generation through Claude Code.
 
 Your data stays on your machine, syncs via Dropbox, and never touches external servers except for explicit local LLM calls via Ollama (optional, for GraphRAG).
 
@@ -226,7 +223,7 @@ Base: `http://localhost:8420`
 | `EXOBRAIN_EMBED_MODEL` | `nomic-embed-text` | Embedding model for vector search |
 | `EXOBRAIN_API_PORT` | `8420` | API server port |
 
-## Claude Writer Commands
+## Commands
 
 Open this project in Claude Code to use:
 

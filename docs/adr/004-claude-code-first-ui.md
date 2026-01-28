@@ -7,7 +7,7 @@
 
 ## Context
 
-ExoBrain needs a user interface for capture, query, and annotation workflows. Several options were considered: a custom web UI, a desktop application, a terminal UI (TUI), or leveraging Claude Code, which is already the user's primary development and writing environment via the claude_writer project.
+ExoBrain needs a user interface for capture, query, and annotation workflows. Several options were considered: a custom web UI, a desktop application, a terminal UI (TUI), or leveraging Claude Code, which is already the user's primary development and writing environment via the ExoBrain project.
 
 The user's existing workflow is entirely within Claude Code. Commands like `/ideate`, `/generate-view`, and `/generate-transcript` already orchestrate complex multi-step processes. Adding ExoBrain interactions to this same environment means zero context switching and immediate access to the full knowledge system during ideation and writing.
 
