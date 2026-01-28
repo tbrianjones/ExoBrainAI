@@ -1,8 +1,8 @@
 # ADR 001: ExoBrain v2 GraphRAG Memory Engine
 
-- **Status:** Accepted
+- **Status:** Superseded (temporarily deactivated)
 - **Date:** 2026-01-24
-- **Updated:** 2026-01-25
+- **Updated:** 2026-01-27
 - **Tags:** architecture, infrastructure, graphrag, local-first
 - **Impact:** High
 
@@ -17,6 +17,12 @@ V2 redesigns the system around two distinct memory layers:
 2. **Searchable Memory Layer**: GraphRAG-powered knowledge graph built from the hard memory layer. Regenerable at any time from the canonical raw data.
 
 This separation means raw data survives technology changes. As memory engines evolve (GraphRAG today, something better tomorrow), the raw data can always be reparsed into new systems.
+
+## Supersession Note
+
+The GraphRAG memory layer is temporarily deactivated as of commit 64d16c7. A SQLite base memory layer (ADR-002) is being built as the new source of truth for document storage, overlay aggregation, and querying. GraphRAG will be reconnected as an optional search layer in Phase 6 of that plan.
+
+The raw data format decisions in this ADR remain valid; the canonical `raw/` and `overlay/` directory structure and append-only JSONL overlay format are preserved. See ADR-002 for the new core architecture.
 
 ## Decision Drivers
 
@@ -199,9 +205,11 @@ Key settings in `engine/src/graphrag/config.py`:
 
 ## References
 
-- PRD: `docs/active/20260123-exobrain-v2-graphrag-memory-engine-prd-chatgpt.md`
-- Development Plan: `docs/active/20260124-exobrain-v2-graphrag-memory-engine-dev-plan-claude.md`
-- Best Practices: `docs/active/graphrag-ollama-best-practices.md`
+- ADR-002: `docs/adr/002-sqlite-core-memory-layer.md`
+- SQLite Plan: `docs/archive/sqlite-base-memory-layer/20260127-exobrain-v2-sqlite-base-memory-layer-dev-plan-claude.md`
+- PRD: `docs/archive/graph-rag-initial-implementation/20260123-exobrain-v2-graphrag-memory-engine-prd-chatgpt.md`
+- Development Plan: `docs/archive/graph-rag-initial-implementation/20260124-exobrain-v2-graphrag-memory-engine-dev-plan-claude.md`
+- Best Practices: `docs/archive/graph-rag-initial-implementation/graphrag-ollama-best-practices.md`
 - GraphRAG: https://github.com/microsoft/graphrag
 - GraphRAG Configuration: https://microsoft.github.io/graphrag/config/yaml/
 - UUIDv7: https://www.rfc-editor.org/rfc/rfc9562.html

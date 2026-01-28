@@ -3,6 +3,9 @@
 This document defines the **absolute minimum conceptual data structure** for ExoBrain v0.
 It is intentionally simple. It defines *what must exist*, not how it is stored in SQL.
 
+**Status:** Implemented. See the development plan for implementation details:
+`docs/archive/sqlite-base-memory-layer/20260127-exobrain-v2-sqlite-base-memory-layer-dev-plan-claude.md`
+
 ---
 
 ## Core Principles
@@ -25,7 +28,7 @@ An object has:
 - **Type** – reference to a *type object*
 - **Space** – reference to a *space object*
 - **Title** – human-readable name
-- **Summary** – short text (explicitly called “summary”, not description)
+- **Summary** – short text (explicitly called "summary", not description)
 - **Tags** – zero or more tags (string or object reference)
 - **File reference** – zero or one file/blob reference
 - **Created at**
@@ -156,10 +159,10 @@ A link has:
 - **Relationship text** (short descriptive phrase or sentence)
 
 Examples:
-- “derived from”
-- “summarizes”
-- “related to”
-- “evidence for”
+- "derived from"
+- "summarizes"
+- "related to"
+- "evidence for"
 
 Rules:
 - Links are optional
@@ -192,7 +195,7 @@ To bootstrap system structure:
 Within it:
 - `primitives/type` – type objects
 - `primitives/space` – space objects
-- `primitives/tag` or `primitives/tags` – tag objects (naming TBD)
+- `primitives/tag` – tag objects
 
 User content lives outside `primitives`.
 

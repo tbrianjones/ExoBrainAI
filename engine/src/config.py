@@ -28,10 +28,10 @@ class Settings(BaseSettings):
     user: str = "Unknown"
     user_email: str = ""
 
-    # Data directory (canonical data: raw docs, overlays) - syncs via Dropbox
+    # Data directory (canonical data: DB, files, legacy raw/overlays) ; syncs via Dropbox
     data_dir: Path = Path(os.environ.get("EXOBRAIN_DATA_DIR", "/data"))
 
-    # Cache directory (derived data: staged, graphrag, logs) - container-local
+    # Cache directory (derived data: staged, graphrag, logs) ; container-local
     cache_dir: Path = Path(os.environ.get("EXOBRAIN_CACHE_DIR", "/cache"))
 
     # API settings
@@ -41,29 +41,41 @@ class Settings(BaseSettings):
     # Ollama settings
     ollama_mode: str = os.environ.get("EXOBRAIN_OLLAMA_MODE", "native")
     ollama_host: str = _get_ollama_host()
-    llm_model: str = "llama3.1:8b"  # 8B recommended; use 3B only for testing
+    llm_model: str = "llama3.1:8b"
     embed_model: str = "nomic-embed-text"
 
-    # Overlay settings
+    # Overlay settings (legacy)
     overlay_window_days: int = 30
 
-    # Watcher settings
+    # Watcher settings (legacy)
     watcher_debounce_seconds: float = 2.0
 
     class Config:
         env_prefix = "EXOBRAIN_"
         env_file = ".env"
 
-    # === Canonical data (Dropbox-synced) ===
+    # === SQLite database (v2 source of truth) ===
+
+    @property
+    def db_path(self) -> Path:
+        """Path to the SQLite database file."""
+        return self.data_dir / "exobrain.db"
+
+    @property
+    def files_dir(self) -> Path:
+        """Directory for file attachments (sharded by object ID)."""
+        return self.data_dir / "files"
+
+    # === Legacy canonical data (Dropbox-synced, v1) ===
 
     @property
     def raw_dir(self) -> Path:
-        """Directory for raw documents (canonical)."""
+        """Directory for raw documents (legacy v1)."""
         return self.data_dir / "raw"
 
     @property
     def overlay_dir(self) -> Path:
-        """Directory for overlay annotations (canonical)."""
+        """Directory for overlay annotations (legacy v1)."""
         return self.data_dir / "overlay" / "annotations"
 
     # === Derived data (container-local) ===
@@ -85,7 +97,11 @@ class Settings(BaseSettings):
 
     def ensure_dirs(self) -> None:
         """Create all required directories if they don't exist."""
-        # Canonical directories
+        # v2 directories
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.files_dir.mkdir(parents=True, exist_ok=True)
+
+        # Legacy canonical directories
         for d in [self.raw_dir, self.overlay_dir]:
             d.mkdir(parents=True, exist_ok=True)
 

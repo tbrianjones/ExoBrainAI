@@ -2,7 +2,7 @@
 
 Two-layer personal knowledge system:
 
-1. **ExoBrain** ; GraphRAG memory engine (Docker-based, local LLM)
+1. **ExoBrain** ; SQLite-backed knowledge engine (everything is an object)
 2. **Claude Writer** ; Ideation and content generation (Claude Code commands)
 
 ## ExoBrain Quick Reference
@@ -11,23 +11,30 @@ Two-layer personal knowledge system:
 # Start the engine
 docker compose up -d
 
-# Capture a thought
-echo "My idea..." | docker compose exec -T exobrain exobrain capture
+# Initialize (first time)
+docker compose exec exobrain exobrain init
 
-# Query your memory
-docker compose exec exobrain exobrain query "What themes emerge?"
+# Capture a thought
+docker compose exec exobrain exobrain capture "My idea..." --title "Insight" --type note --tag brainstorm
+
+# Search your memory
+docker compose exec exobrain exobrain search "idea"
+
+# List objects
+docker compose exec exobrain exobrain list --type note --tag brainstorm
 
 # Check status
 docker compose exec exobrain exobrain status
 ```
 
+**All CLI commands support `--json` for structured output.**
+
 **Endpoints:**
 - API: http://localhost:8420
-- Graph: http://localhost:8081 (Gephi Lite)
 - Logs: http://localhost:9998 (Dozzle)
 
 **Data locations:**
-- `$EXOBRAIN_DATA_DIR` ; Canonical data (raw/, overlay/) ; syncs via Dropbox
+- `$EXOBRAIN_DATA_DIR` ; Canonical data (exobrain.db, files/) ; syncs via Dropbox
 - Container volume ; Derived data (staged/, graphrag/) ; regenerable
 
 ## Commands vs Agents vs Skills
@@ -62,7 +69,7 @@ docker compose exec exobrain exobrain status
 
 | Skill | Purpose |
 |-------|---------|
-| `exobrain` | Interface with ExoBrain memory engine (CLI and API) |
+| `exobrain` | Interface with ExoBrain knowledge system (SQLite + CLI) |
 | `title-generation` | Generate effective titles and headlines |
 | `summary-generation` | Generate summaries, abstracts, briefs |
 | `tag-generation` | Generate tags, hashtags, and classifications |
@@ -70,13 +77,13 @@ docker compose exec exobrain exobrain status
 ## Repository Structure
 
 ```
-├── engine/                 # ExoBrain memory engine
+├── engine/                 # ExoBrain knowledge engine
 │   └── src/
-│       ├── core/           # Models, raw ops, overlay ops, stager
-│       ├── graphrag/       # GraphRAG config, indexer, querier
+│       ├── core/           # DB, schema, models, bootstrap, repository
+│       ├── graphrag/       # GraphRAG config, indexer, querier, adapter
 │       ├── cli/            # Typer CLI commands
 │       ├── api/            # FastAPI routes
-│       └── watcher/        # File watcher, scheduler
+│       └── watcher/        # File watcher
 ├── .claude/
 │   ├── commands/           # User-invoked commands
 │   ├── agents/             # Autonomous subagents
@@ -100,36 +107,51 @@ docker compose exec exobrain exobrain status
 
 Run via: `docker compose exec exobrain exobrain <command>`
 
+### System
+
 | Command | Description |
 |---------|-------------|
-| `init` | Create directories, pull Ollama models |
-| `status` | Show document counts, index status |
-| `doctor` | Validate config, check Ollama connectivity |
-| `capture [content]` | Capture new document (stdin or argument) |
-| `stage --all` | Stage all documents |
-| `stage --doc <id>` | Stage specific document |
-| `index` | Run incremental GraphRAG update |
-| `rebuild` | Full index rebuild |
-| `query "<text>"` | Global (theme) query |
-| `query --mode local "<text>"` | Local (entity) query |
-| `migrate <path>` | Migrate from ideas/ (dry-run by default) |
+| `init` | Create DB, run migrations, bootstrap types/spaces |
+| `status` | Object counts, DB size, integrity |
+| `doctor` | Validate DB integrity, check orphaned files |
+| `version` | Show version |
 
-## ExoBrain HTTP API
+### Objects
 
-Base: `http://localhost:8420`
+| Command | Description |
+|---------|-------------|
+| `capture [CONTENT]` | Create object; `--title`, `--type`, `--space`, `--tag`, `--file` |
+| `get ID` | Full object detail with tags, links, file info |
+| `list` | Filter: `--type`, `--space`, `--tag`, `--limit`, `--offset` |
+| `update ID` | `--title`, `--summary`, `--content`, `--space` |
+| `delete ID` | Delete with confirmation (`--yes` to skip) |
+| `search QUERY` | FTS5 search across title, summary, content |
 
-```
-GET  /health                 # Health check
-GET  /status                 # Full status
-POST /query/global           # Theme query
-POST /query/local            # Entity query
-GET  /doc/                   # List documents
-GET  /doc/{id}               # Get document
-GET  /doc/{id}/overlay       # Get overlay data
-POST /admin/stage            # Trigger staging
-POST /admin/index/incremental
-POST /admin/index/rebuild
-```
+### Tags, Links, Types, Spaces, Files
+
+| Command | Description |
+|---------|-------------|
+| `tag add ID TAG` | Add tag to object |
+| `tag remove ID TAG` | Remove tag from object |
+| `tag list` | All tags with counts |
+| `link create FROM TO REL` | Link two objects |
+| `link list ID` | Show links for object |
+| `link remove LINK_ID` | Remove link |
+| `type list` | List all types |
+| `type create NAME` | Create new type |
+| `space list` | List all spaces |
+| `space create NAME` | Create space (auto-creates parents) |
+| `file attach ID PATH` | Attach file to object |
+| `file detach ID` | Remove file |
+| `file path ID` | Print file path |
+
+### GraphRAG (Optional)
+
+| Command | Description |
+|---------|-------------|
+| `graphrag stage` | Stage SQLite objects for GraphRAG |
+| `graphrag index` | Run GraphRAG indexing |
+| `graphrag query "text"` | Query the GraphRAG index |
 
 ## Working in Idea Spaces
 

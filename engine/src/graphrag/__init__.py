@@ -20,11 +20,18 @@ from src.graphrag.querier import (
     query_local,
 )
 
+try:
+    from src.graphrag.adapter import stage_for_graphrag
+except ImportError:
+    pass
+
 __all__ = [
     # Config
     "get_graphrag_root",
     "get_graphrag_settings",
     "write_graphrag_settings",
+    # Adapter
+    "stage_for_graphrag",
     # Indexer
     "IndexError",
     "ensure_graphrag_initialized",

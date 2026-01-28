@@ -1,7 +1,9 @@
-# Ollama mode: native (recommended) or docker
-# Set OLLAMA_MODE in .env file
-# - native: Ollama runs on host Mac with GPU acceleration (20-30x faster)
-# - docker: Ollama runs in container on CPU only (for testing)
+# ExoBrain v2: SQLite-backed personal knowledge system
+#
+# Core services: exobrain (CLI + API)
+# Optional profiles:
+#   - graphrag: Ollama, Gephi Lite, watcher
+#   - docker: Docker-based Ollama (CPU only; native recommended)
 
 services:
   exobrain:
@@ -16,10 +18,9 @@ services:
       - EXOBRAIN_CACHE_DIR=/cache
       - EXOBRAIN_USER=${EXOBRAIN_USER:-Unknown}
       - EXOBRAIN_USER_EMAIL=${EXOBRAIN_USER_EMAIL:-}
-      # Ollama mode: native (GPU on host) or docker (CPU in container)
       - EXOBRAIN_OLLAMA_MODE=${OLLAMA_MODE:-native}
     volumes:
-      # Canonical data (Dropbox-synced): raw docs and overlays
+      # Canonical data (Dropbox-synced): DB, files, legacy raw/overlays
       - ${EXOBRAIN_DATA_DIR}:/data
       # Derived data (container-local): staged, graphrag, logs
       - exobrain_cache:/cache
@@ -34,19 +35,20 @@ services:
     restart: unless-stopped
     command: ["python", "-m", "src.api.main"]
 
+  # File watcher (optional; GraphRAG profile)
   watcher:
     build:
       context: ./engine
       dockerfile: Dockerfile
     container_name: exobrain-watcher
+    profiles:
+      - graphrag
     environment:
       - EXOBRAIN_DATA_DIR=/data
       - EXOBRAIN_CACHE_DIR=/cache
       - EXOBRAIN_OLLAMA_MODE=${OLLAMA_MODE:-native}
     volumes:
-      # Canonical data (Dropbox-synced): raw docs and overlays
       - ${EXOBRAIN_DATA_DIR}:/data
-      # Derived data (container-local): staged, graphrag, logs
       - exobrain_cache:/cache
     depends_on:
       - exobrain
@@ -54,7 +56,6 @@ services:
     command: ["python", "-m", "src.watcher.main"]
 
   # Docker-based Ollama (only starts with --profile docker)
-  # Use: docker compose --profile docker up
   ollama:
     image: ollama/ollama:latest
     container_name: exobrain-ollama
@@ -65,15 +66,10 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     environment:
-      # GraphRAG requires large context for community_reports (8K+ input)
-      # IMPORTANT: Docker Desktop must have 12GB+ RAM allocated
       - OLLAMA_CONTEXT_LENGTH=8192
-      # Use fp16 for faster generation on Apple Silicon
       - OLLAMA_KV_CACHE_TYPE=fp16
-      # Give model more time to load
       - OLLAMA_KEEP_ALIVE=30m
     healthcheck:
-      # Basic check that Ollama is responding; model pull happens via init command
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 30s
@@ -81,6 +77,7 @@ services:
       start_period: 120s
     restart: unless-stopped
 
+  # Log viewer
   dozzle:
     image: amir20/dozzle:latest
     container_name: exobrain-dozzle
@@ -92,9 +89,12 @@ services:
       - DOZZLE_FILTER=name=exobrain
     restart: unless-stopped
 
+  # Graph visualization (optional; GraphRAG profile)
   gephi-lite:
     image: ouestware/gephi-lite
     container_name: exobrain-gephi
+    profiles:
+      - graphrag
     ports:
       - "${GEPHI_PORT:-8081}:80"
     restart: unless-stopped
@@ -102,5 +102,3 @@ services:
 volumes:
   ollama_models:
   exobrain_cache:
-    # Container-local volume for derived/regenerable data
-    # Can be safely deleted; will rebuild on next index

@@ -1,5 +1,11 @@
-"""ExoBrain CLI entry point."""
+"""ExoBrain CLI entry point.
 
+The CLI is the sole write interface for ExoBrain. All commands support --json output.
+"""
+
+import json
+import sys
+from contextlib import contextmanager
 from typing import Optional
 
 import typer
@@ -8,9 +14,157 @@ from src import __version__
 
 app = typer.Typer(
     name="exobrain",
-    help="Local-first GraphRAG memory engine",
+    help="ExoBrain: local-first personal knowledge system",
     no_args_is_help=True,
 )
+
+# Subcommand groups
+tag_app = typer.Typer(help="Manage tags on objects")
+link_app = typer.Typer(help="Manage links between objects")
+type_app = typer.Typer(help="Manage object types")
+space_app = typer.Typer(help="Manage spaces")
+file_app = typer.Typer(help="Manage file attachments")
+graphrag_app = typer.Typer(help="GraphRAG operations (optional)")
+
+app.add_typer(tag_app, name="tag")
+app.add_typer(link_app, name="link")
+app.add_typer(type_app, name="type")
+app.add_typer(space_app, name="space")
+app.add_typer(file_app, name="file")
+app.add_typer(graphrag_app, name="graphrag")
+
+
+def _output(data: dict | list, as_json: bool = False) -> None:
+    """Output data as JSON or human-readable text."""
+    if as_json:
+        typer.echo(json.dumps(data, indent=2, default=str))
+    else:
+        if isinstance(data, list):
+            for item in data:
+                _print_object_summary(item)
+        elif isinstance(data, dict):
+            _print_object_detail(data)
+
+
+def _print_object_summary(obj: dict) -> None:
+    """Print a compact one-line object summary."""
+    obj_id = obj.get("id", "?")[:12]
+    type_name = obj.get("type_name", obj.get("type", "?"))
+    title = obj.get("title", "untitled")
+    typer.echo(f"  {obj_id}  [{type_name}]  {title}")
+
+
+def _print_object_detail(obj: dict) -> None:
+    """Print full object detail."""
+    typer.echo(f"ID:      {obj.get('id', '?')}")
+    typer.echo(f"Type:    {obj.get('type_name', obj.get('type', '?'))}")
+    typer.echo(f"Space:   {obj.get('space_name', obj.get('space', '?'))}")
+    typer.echo(f"Title:   {obj.get('title', '')}")
+    if obj.get("summary"):
+        typer.echo(f"Summary: {obj['summary']}")
+    if obj.get("content"):
+        typer.echo(f"Content: {obj['content']}")
+    if obj.get("created_at"):
+        typer.echo(f"Created: {obj['created_at']}")
+    if obj.get("updated_at"):
+        typer.echo(f"Updated: {obj['updated_at']}")
+
+
+def _get_db():
+    """Get a database connection, initializing if needed."""
+    from src.core.db import get_connection, get_db_path
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        typer.echo("Database not found. Run 'exobrain init' first.", err=True)
+        raise typer.Exit(1)
+    return get_connection(db_path)
+
+
+@contextmanager
+def _db_session():
+    """Context manager that opens and guarantees closing of a DB connection."""
+    conn = _get_db()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def _resolve_id(conn, id_or_prefix: str) -> str:
+    """Resolve an ID or prefix to a full object ID."""
+    from src.core.repository import ObjectRepo
+
+    repo = ObjectRepo(conn)
+    resolved = repo.resolve_id(id_or_prefix)
+    if not resolved:
+        # Check if prefix is ambiguous (multiple matches)
+        if len(id_or_prefix) >= 8:
+            rows = conn.execute(
+                "SELECT id, title FROM objects WHERE id LIKE ?", (id_or_prefix + "%",)
+            ).fetchall()
+            if len(rows) > 1:
+                typer.echo(f"Ambiguous prefix '{id_or_prefix}'; matches {len(rows)} objects:", err=True)
+                for r in rows[:10]:
+                    typer.echo(f"  {r['id'][:12]}  {r['title']}", err=True)
+                raise typer.Exit(1)
+        typer.echo(f"Object not found: {id_or_prefix}", err=True)
+        raise typer.Exit(1)
+    return resolved
+
+
+def _resolve_type_id(conn, type_name: str) -> str:
+    """Resolve a type name to its object ID."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+
+    # Check bootstrap types first (case-insensitive).
+    # Keys containing "/" are spaces (e.g., "primitives/type"), not types.
+    for key, obj_id in BOOTSTRAP_IDS.items():
+        if key == type_name.lower() and "/" not in key:
+            return obj_id
+
+    # Try DB lookup
+    row = conn.execute(
+        """SELECT id FROM objects WHERE type_id = ? AND LOWER(title) = ?""",
+        (BOOTSTRAP_IDS["type"], type_name.lower()),
+    ).fetchone()
+    if row:
+        return row["id"]
+
+    typer.echo(f"Unknown type: {type_name}", err=True)
+    raise typer.Exit(1)
+
+
+def _escape_like(value: str) -> str:
+    """Escape LIKE wildcard characters (%, _, \\) in a value."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _resolve_space_id(conn, space_name: str) -> str:
+    """Resolve a space name to its object ID.
+
+    Matches by: bootstrap key, exact title, or exact summary (hierarchical path).
+    """
+    from src.core.bootstrap import BOOTSTRAP_IDS
+
+    # Check bootstrap spaces first (exact key match)
+    if space_name in BOOTSTRAP_IDS:
+        return BOOTSTRAP_IDS[space_name]
+
+    # Try DB lookup: exact title match or exact summary match
+    row = conn.execute(
+        """SELECT id FROM objects WHERE type_id = ?
+           AND (LOWER(title) = ? OR LOWER(summary) = ?)""",
+        (BOOTSTRAP_IDS["space"], space_name.lower(), space_name.lower()),
+    ).fetchone()
+    if row:
+        return row["id"]
+
+    typer.echo(f"Unknown space: {space_name}. Create it with 'exobrain space create {space_name}'", err=True)
+    raise typer.Exit(1)
+
+
+# === System Commands ===
 
 
 @app.command()
@@ -20,248 +174,800 @@ def version():
 
 
 @app.command()
-def init():
-    """Initialize data directories and pull Ollama models."""
-    import httpx
-
+def init(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Initialize the database, run migrations, and bootstrap types/spaces."""
     from src.config import settings
-    from src.graphrag import write_graphrag_settings
+    from src.core.bootstrap import bootstrap
+    from src.core.db import check_integrity, init_db
 
-    typer.echo(f"Initializing ExoBrain in {settings.data_dir}...")
     settings.ensure_dirs()
-    typer.echo("Created directories:")
-    typer.echo(f"  - {settings.raw_dir}")
-    typer.echo(f"  - {settings.overlay_dir}")
-    typer.echo(f"  - {settings.staged_dir}")
-    typer.echo(f"  - {settings.graphrag_dir}")
-    typer.echo(f"  - {settings.logs_dir}")
+    conn = init_db()
+    result = bootstrap(conn)
+    integrity = check_integrity(conn)
+    conn.close()
 
-    # Create symlink: graphrag/input -> staged/ (GraphRAG expects relative paths)
-    input_link = settings.graphrag_dir / "input"
-    if not input_link.exists():
-        input_link.symlink_to(settings.staged_dir)
-        typer.echo(f"  - {input_link} -> {settings.staged_dir}")
+    output = {
+        "status": "ok",
+        "db_path": str(settings.db_path),
+        "migrations_applied": True,
+        "bootstrap": result,
+        "integrity": integrity,
+    }
+
+    if json_output:
+        typer.echo(json.dumps(output, indent=2))
     else:
-        typer.echo(f"  - {input_link} (symlink exists)")
-
-    # Initialize GraphRAG settings
-    settings_path = write_graphrag_settings()
-    typer.echo(f"  - {settings_path}")
-
-    # Try to pull Ollama models
-    typer.echo(f"\nOllama mode: {settings.ollama_mode}")
-    typer.echo(f"Ollama host: {settings.ollama_host}")
-
-    # Check if Ollama is reachable
-    try:
-        httpx.get(f"{settings.ollama_host}/api/tags", timeout=5.0)
-        ollama_available = True
-    except Exception:
-        ollama_available = False
-
-    if not ollama_available:
-        if settings.ollama_mode == "native":
-            typer.echo("\n[WARN] Native Ollama is not running.")
-            typer.echo("       Run: ./scripts/setup-native-ollama.sh")
-            typer.echo("\n       Or start it manually:")
-            typer.echo("         brew install ollama")
-            typer.echo("         ollama serve")
-        else:
-            typer.echo("\n[WARN] Docker Ollama is not running.")
-            typer.echo("       Start with: docker compose --profile docker up -d")
-    else:
-        typer.echo(f"\nPulling Ollama models...")
-        for model in [settings.llm_model, settings.embed_model]:
-            try:
-                typer.echo(f"  Pulling {model}...")
-                response = httpx.post(
-                    f"{settings.ollama_host}/api/pull",
-                    json={"name": model},
-                    timeout=600.0,
-                )
-                if response.status_code == 200:
-                    typer.echo(f"  [OK] {model}")
-                else:
-                    typer.echo(f"  [WARN] Could not pull {model}: {response.status_code}")
-            except Exception as e:
-                typer.echo(f"  [WARN] Could not pull {model}: {e}")
-
-    typer.echo("\nDone. Add raw documents to the raw/ directory to get started.")
+        typer.echo(f"Initialized ExoBrain at {settings.db_path}")
+        typer.echo(f"  Types: {result['types_created']} created ({result['total_bootstrap_objects']} total bootstrap objects)")
+        typer.echo(f"  Spaces: {result['spaces_created']} created")
+        typer.echo(f"  Integrity: {'OK' if integrity['ok'] else 'FAILED'}")
 
 
 @app.command()
-def status():
-    """Show ExoBrain status."""
-    from src.config import settings
-    from src.graphrag import get_index_status
-
-    typer.echo(f"Data directory: {settings.data_dir}")
-    typer.echo(f"Ollama mode: {settings.ollama_mode}")
-    typer.echo(f"Ollama host: {settings.ollama_host}")
-    typer.echo(f"LLM model: {settings.llm_model}")
-    typer.echo(f"Embed model: {settings.embed_model}")
-
-    # Count files
-    raw_count = len(list(settings.raw_dir.glob("*.md"))) if settings.raw_dir.exists() else 0
-    staged_count = (
-        len(list(settings.staged_dir.glob("*.txt"))) if settings.staged_dir.exists() else 0
-    )
-
-    typer.echo(f"\nDocuments:")
-    typer.echo(f"  Raw: {raw_count}")
-    typer.echo(f"  Staged: {staged_count}")
-
-    # Index status
-    idx_status = get_index_status()
-    typer.echo(f"\nIndex:")
-    typer.echo(f"  Indexed: {idx_status.get('indexed', False)}")
-    if idx_status.get("timestamp"):
-        typer.echo(f"  Last build: {idx_status['timestamp']}")
-
-
-@app.command()
-def doctor():
-    """Validate configuration and connectivity."""
-    import httpx
-
-    from src.config import settings
-
-    typer.echo("Checking ExoBrain configuration...")
-    errors = []
-
-    # Check data directory
-    if not settings.data_dir.exists():
-        errors.append(f"Data directory does not exist: {settings.data_dir}")
-    else:
-        typer.echo(f"[OK] Data directory: {settings.data_dir}")
-
-    # Check subdirectories
-    for name, path in [
-        ("raw", settings.raw_dir),
-        ("overlay", settings.overlay_dir),
-        ("staged", settings.staged_dir),
-        ("graphrag", settings.graphrag_dir),
-    ]:
-        if path.exists():
-            typer.echo(f"[OK] {name}: {path}")
-        else:
-            typer.echo(f"[WARN] {name} does not exist: {path}")
-
-    # Check Ollama connectivity
-    typer.echo(f"\nOllama mode: {settings.ollama_mode}")
-    try:
-        response = httpx.get(f"{settings.ollama_host}/api/tags", timeout=5.0)
-        if response.status_code == 200:
-            typer.echo(f"[OK] Ollama connection: {settings.ollama_host}")
-            # Check for required models
-            data = response.json()
-            models = [m["name"] for m in data.get("models", [])]
-            for model in [settings.llm_model, settings.embed_model]:
-                # Model names might include :latest suffix
-                if any(model in m or m.startswith(model.split(":")[0]) for m in models):
-                    typer.echo(f"[OK] Model available: {model}")
-                else:
-                    typer.echo(f"[WARN] Model not found: {model}")
-        else:
-            errors.append(f"Ollama returned status {response.status_code}")
-    except Exception as e:
-        if settings.ollama_mode == "native":
-            errors.append(
-                f"Cannot connect to native Ollama at {settings.ollama_host}.\n"
-                "    Run: ./scripts/setup-native-ollama.sh"
-            )
-        else:
-            errors.append(f"Cannot connect to Ollama: {e}")
-
-    if errors:
-        typer.echo("\nErrors found:")
-        for err in errors:
-            typer.echo(f"  - {err}")
-        raise typer.Exit(1)
-    else:
-        typer.echo("\nAll checks passed.")
-
-
-@app.command()
-def stage(
-    doc_id: Optional[str] = typer.Option(None, "--doc", "-d", help="Stage a specific document"),
-    all_docs: bool = typer.Option(False, "--all", "-a", help="Stage all documents"),
+def status(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """Stage documents for indexing."""
-    from src.core import list_raw_docs, stage_all, stage_doc
+    """Show ExoBrain status: object counts, DB size, integrity."""
+    from src.config import settings
+    from src.core.db import check_integrity
+    from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
 
-    if doc_id:
-        typer.echo(f"Staging document: {doc_id}")
-        result = stage_doc(doc_id)
-        if result:
-            typer.echo(f"Staged: {result}")
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        tag_repo = TagRepo(conn)
+        link_repo = LinkRepo(conn)
+        file_repo = FileRepo(conn)
+
+        type_counts = obj_repo.count_by_type()
+        object_count = obj_repo.count()
+        tag_count = tag_repo.count()
+        link_count = link_repo.count()
+        file_count = file_repo.count()
+        db_size = settings.db_path.stat().st_size if settings.db_path.exists() else 0
+
+        integrity = check_integrity(conn)
+
+    output = {
+        "version": __version__,
+        "data_dir": str(settings.data_dir),
+        "db_path": str(settings.db_path),
+        "db_size_bytes": db_size,
+        "object_count": object_count,
+        "type_counts": type_counts,
+        "tag_count": tag_count,
+        "link_count": link_count,
+        "file_count": file_count,
+        "integrity": "ok" if integrity["ok"] else "failed",
+    }
+
+    if json_output:
+        typer.echo(json.dumps(output, indent=2))
+    else:
+        typer.echo(f"ExoBrain v{__version__}")
+        typer.echo(f"Data: {settings.data_dir}")
+        typer.echo(f"DB:   {settings.db_path} ({db_size:,} bytes)")
+        typer.echo(f"\nObjects: {output['object_count']}")
+        for type_name, count in type_counts.items():
+            typer.echo(f"  {type_name}: {count}")
+        typer.echo(f"\nTags:  {output['tag_count']} distinct")
+        typer.echo(f"Links: {output['link_count']}")
+        typer.echo(f"Files: {output['file_count']}")
+        typer.echo(f"\nIntegrity: {output['integrity']}")
+
+
+@app.command()
+def doctor(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Validate DB integrity, check for orphans, run FK check."""
+    from src.config import settings
+    from src.core.db import check_integrity
+
+    with _db_session() as conn:
+        integrity = check_integrity(conn)
+
+        # Check for orphaned files on disk
+        orphaned_files = []
+        if settings.files_dir.exists():
+            for file_path in settings.files_dir.rglob("*"):
+                if file_path.is_file():
+                    rel = str(file_path.relative_to(settings.files_dir))
+                    row = conn.execute(
+                        "SELECT object_id FROM files WHERE path = ?", (rel,)
+                    ).fetchone()
+                    if not row:
+                        orphaned_files.append(str(file_path))
+
+    output = {
+        "integrity": integrity["integrity"],
+        "foreign_key_violations": integrity["foreign_key_violations"],
+        "ok": integrity["ok"],
+        "orphaned_files": orphaned_files,
+    }
+
+    if json_output:
+        typer.echo(json.dumps(output, indent=2))
+    else:
+        if integrity["ok"]:
+            typer.echo("[OK] Database integrity check passed")
         else:
-            typer.echo(f"Error: Document not found: {doc_id}", err=True)
+            typer.echo(f"[FAIL] Integrity: {integrity['integrity']}")
+            typer.echo(f"[FAIL] FK violations: {integrity['foreign_key_violations']}")
+        if orphaned_files:
+            typer.echo(f"[WARN] {len(orphaned_files)} orphaned files on disk")
+            for f in orphaned_files[:5]:
+                typer.echo(f"  {f}")
+        else:
+            typer.echo("[OK] No orphaned files")
+
+    if not integrity["ok"]:
+        raise typer.Exit(1)
+
+
+# === Object Commands ===
+
+
+@app.command()
+def capture(
+    content: Optional[str] = typer.Argument(None, help="Content to capture (or use stdin)"),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="Title"),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Summary"),
+    type_name: str = typer.Option("document", "--type", help="Object type"),
+    space_name: Optional[str] = typer.Option(None, "--space", help="Space name"),
+    tags: Optional[list[str]] = typer.Option(None, "--tag", help="Tag (repeatable)"),
+    file_path: Optional[str] = typer.Option(None, "--file", "-f", help="File to attach"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Capture a new object. Content via argument or stdin."""
+    from src.core.repository import FileRepo, ObjectRepo, TagRepo
+
+    # Read from stdin if no content provided
+    if content is None:
+        if sys.stdin.isatty():
+            typer.echo("Enter content (Ctrl+D to finish):")
+        content = sys.stdin.read().strip()
+
+    if not content and not title:
+        typer.echo("Error: provide content or at least a title", err=True)
+        raise typer.Exit(1)
+
+    with _db_session() as conn:
+        type_id = _resolve_type_id(conn, type_name)
+
+        # Default space: inbox
+        if space_name:
+            space_id = _resolve_space_id(conn, space_name)
+        else:
+            from src.core.bootstrap import BOOTSTRAP_IDS
+
+            space_id = BOOTSTRAP_IDS["inbox"]
+
+        # Atomic: create object, add tags, attach file in one transaction.
+        # Individual repo methods commit internally, but if file attach fails
+        # we want the whole operation to be visible as partial. Wrap the
+        # multi-step operation so failure is clear.
+        obj_repo = ObjectRepo(conn)
+        obj = obj_repo.create(
+            type_id=type_id,
+            space_id=space_id,
+            title=title or (content[:80] if content else "Untitled"),
+            summary=summary,
+            content=content or None,
+        )
+
+        try:
+            # Add tags
+            if tags:
+                tag_repo = TagRepo(conn)
+                for tag_text in tags:
+                    tag_repo.add(obj["id"], tag_text)
+
+            # Attach file
+            if file_path:
+                file_repo = FileRepo(conn)
+                file_repo.attach(obj["id"], file_path)
+        except Exception:
+            # Roll back the entire capture on failure
+            obj_repo.delete(obj["id"])
+            raise
+
+        # Re-fetch with all data
+        obj = obj_repo.get(obj["id"])
+
+    if json_output:
+        _output(obj, as_json=True)
+    else:
+        typer.echo(f"Created: {obj['id']}")
+        typer.echo(f"  Type:  {obj['type_name']}")
+        typer.echo(f"  Title: {obj['title']}")
+        if tags:
+            typer.echo(f"  Tags:  {', '.join(tags)}")
+        if file_path:
+            typer.echo(f"  File:  {file_path}")
+
+
+@app.command()
+def get(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix (min 8 chars)"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Get full detail for an object."""
+    from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+
+        obj_repo = ObjectRepo(conn)
+        tag_repo = TagRepo(conn)
+        link_repo = LinkRepo(conn)
+        file_repo = FileRepo(conn)
+
+        obj = obj_repo.get(obj_id)
+        obj["tags"] = tag_repo.list_for_object(obj_id)
+        obj["links"] = link_repo.list_all_for(obj_id)
+        obj["file"] = file_repo.get(obj_id)
+
+    if json_output:
+        _output(obj, as_json=True)
+    else:
+        _print_object_detail(obj)
+        if obj["tags"]:
+            typer.echo(f"Tags:    {', '.join(obj['tags'])}")
+        if obj["links"]:
+            typer.echo("Links:")
+            for link in obj["links"]:
+                direction = link.get("direction", "?")
+                rel = link.get("relationship", "?")
+                other = link.get("to_title") or link.get("from_title") or link.get("to_id") or link.get("from_id")
+                typer.echo(f"  [{direction}] {rel} -> {other}")
+        if obj["file"]:
+            typer.echo(f"File:    {obj['file']['path']} ({obj['file'].get('mime_type', 'unknown')})")
+
+
+@app.command(name="list")
+def list_objects(
+    type_name: Optional[str] = typer.Option(None, "--type", help="Filter by type"),
+    space_name: Optional[str] = typer.Option(None, "--space", help="Filter by space"),
+    tag: Optional[str] = typer.Option(None, "--tag", help="Filter by tag"),
+    limit: int = typer.Option(50, "--limit", "-n", help="Max results"),
+    offset: int = typer.Option(0, "--offset", help="Skip first N results"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List objects with optional filters."""
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        objects = obj_repo.list(
+            type_name=type_name,
+            space_name=space_name,
+            tag=tag,
+            limit=limit,
+            offset=offset,
+        )
+
+    if json_output:
+        _output(objects, as_json=True)
+    else:
+        if not objects:
+            typer.echo("No objects found.")
+        else:
+            typer.echo(f"Objects ({len(objects)}):")
+            for obj in objects:
+                _print_object_summary(obj)
+
+
+@app.command()
+def update(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="New title"),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="New summary"),
+    content: Optional[str] = typer.Option(None, "--content", "-c", help="New content"),
+    space_name: Optional[str] = typer.Option(None, "--space", help="Move to space"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Update an object's title, summary, content, or space."""
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+
+        space_id = None
+        if space_name:
+            space_id = _resolve_space_id(conn, space_name)
+
+        obj_repo = ObjectRepo(conn)
+        obj = obj_repo.update(obj_id, title=title, summary=summary, content=content, space_id=space_id)
+
+    if json_output:
+        _output(obj, as_json=True)
+    else:
+        typer.echo(f"Updated: {obj_id}")
+        _print_object_detail(obj)
+
+
+@app.command()
+def delete(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Delete an object and all its tags, links, and file."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+
+        # Guard against deleting bootstrap type/space objects
+        bootstrap_ids = set(BOOTSTRAP_IDS.values())
+        if obj_id in bootstrap_ids:
+            typer.echo(f"Cannot delete bootstrap object: {obj_id}", err=True)
             raise typer.Exit(1)
-    elif all_docs:
-        typer.echo("Staging all documents...")
-        results = stage_all()
-        typer.echo(f"Staged {len(results)} documents")
+
+        obj_repo = ObjectRepo(conn)
+        obj = obj_repo.get(obj_id)
+
+        if not yes:
+            typer.confirm(f"Delete '{obj['title']}' ({obj_id})?", abort=True)
+
+        # ObjectRepo.delete() handles CASCADE + disk cleanup
+        deleted = obj_repo.delete(obj_id)
+
+    result = {"id": obj_id, "deleted": deleted, "title": obj["title"]}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
     else:
-        typer.echo("Specify --doc <id> or --all")
-        raise typer.Exit(1)
+        if deleted:
+            typer.echo(f"Deleted: {obj['title']} ({obj_id})")
+        else:
+            typer.echo(f"Failed to delete: {obj_id}", err=True)
+            raise typer.Exit(1)
 
 
 @app.command()
-def index(
-    incremental: bool = typer.Option(
-        True, "--incremental/--full", help="Incremental or full indexing"
-    ),
-    fast: bool = typer.Option(
-        False, "--fast", "-f", help="Use NLP-based extraction (faster, less accurate)"
-    ),
+def search(
+    query: str = typer.Argument(..., help="Search query"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max results"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """Run GraphRAG indexing on staged documents.
+    """Full-text search across title, summary, and content."""
+    from src.core.repository import ObjectRepo
 
-    Use --fast for much faster indexing using NLP instead of LLM for entity extraction.
-    Standard mode uses LLM for higher quality but is significantly slower.
-    """
-    from src.graphrag import run_index
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        results = obj_repo.search(query, limit=limit)
 
-    method = "fast" if fast else "standard"
-    mode = "incremental" if incremental else "full"
-    typer.echo(f"Running {method} {mode} index...")
+    if json_output:
+        _output(results, as_json=True)
+    else:
+        if not results:
+            typer.echo("No results found.")
+        else:
+            typer.echo(f"Results ({len(results)}):")
+            for obj in results:
+                _print_object_summary(obj)
+                # Show content snippet if available
+                snippet = obj.get("summary") or obj.get("content") or ""
+                if snippet:
+                    if len(snippet) > 120:
+                        snippet = snippet[:120] + "..."
+                    typer.echo(f"           {snippet}")
 
+
+# === Tag Commands ===
+
+
+@tag_app.command("add")
+def tag_add(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    tag_text: str = typer.Argument(..., help="Tag to add"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Add a tag to an object."""
+    from src.core.repository import TagRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+        tag_repo = TagRepo(conn)
+        added = tag_repo.add(obj_id, tag_text)
+
+    result = {"object_id": obj_id, "tag": tag_text, "added": added}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        if added:
+            typer.echo(f"Tagged {obj_id[:12]} with '{tag_text}'")
+        else:
+            typer.echo(f"Tag '{tag_text}' already exists on {obj_id[:12]}")
+
+
+@tag_app.command("remove")
+def tag_remove(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    tag_text: str = typer.Argument(..., help="Tag to remove"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Remove a tag from an object."""
+    from src.core.repository import TagRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+        tag_repo = TagRepo(conn)
+        removed = tag_repo.remove(obj_id, tag_text)
+
+    result = {"object_id": obj_id, "tag": tag_text, "removed": removed}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        if removed:
+            typer.echo(f"Removed tag '{tag_text}' from {obj_id[:12]}")
+        else:
+            typer.echo(f"Tag '{tag_text}' not found on {obj_id[:12]}")
+
+
+@tag_app.command("list")
+def tag_list(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List all tags with usage counts."""
+    from src.core.repository import TagRepo
+
+    with _db_session() as conn:
+        tag_repo = TagRepo(conn)
+        tags = tag_repo.list_all()
+
+    if json_output:
+        typer.echo(json.dumps(tags, indent=2))
+    else:
+        if not tags:
+            typer.echo("No tags found.")
+        else:
+            typer.echo("Tags:")
+            for t in tags:
+                typer.echo(f"  {t['tag_text']} ({t['count']})")
+
+
+# === Link Commands ===
+
+
+@link_app.command("create")
+def link_create(
+    from_prefix: str = typer.Argument(..., help="Source object ID or prefix"),
+    to_prefix: str = typer.Argument(..., help="Target object ID or prefix"),
+    relationship: str = typer.Argument(..., help="Relationship description"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Create a link between two objects."""
+    from src.core.repository import LinkRepo
+
+    with _db_session() as conn:
+        from_id = _resolve_id(conn, from_prefix)
+        to_id = _resolve_id(conn, to_prefix)
+
+        link_repo = LinkRepo(conn)
+        link = link_repo.create(from_id, to_id, relationship)
+
+    if json_output:
+        typer.echo(json.dumps(link, indent=2, default=str))
+    else:
+        if link:
+            typer.echo(f"Linked: {from_id[:12]} --[{relationship}]--> {to_id[:12]}")
+        else:
+            typer.echo("Link already exists.", err=True)
+
+
+@link_app.command("list")
+def link_list(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List all links for an object."""
+    from src.core.repository import LinkRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+        link_repo = LinkRepo(conn)
+        links = link_repo.list_all_for(obj_id)
+
+    if json_output:
+        typer.echo(json.dumps(links, indent=2, default=str))
+    else:
+        if not links:
+            typer.echo("No links found.")
+        else:
+            typer.echo("Links:")
+            for link in links:
+                direction = link.get("direction", "?")
+                rel = link.get("relationship", "?")
+                other = link.get("to_title") or link.get("from_title") or "?"
+                typer.echo(f"  [{direction}] {rel} -> {other} (link #{link['id']})")
+
+
+@link_app.command("remove")
+def link_remove(
+    link_id: int = typer.Argument(..., help="Link ID to remove"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Remove a link by its ID."""
+    from src.core.repository import LinkRepo
+
+    with _db_session() as conn:
+        link_repo = LinkRepo(conn)
+        deleted = link_repo.delete(link_id)
+
+    result = {"link_id": link_id, "deleted": deleted}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        if deleted:
+            typer.echo(f"Removed link #{link_id}")
+        else:
+            typer.echo(f"Link #{link_id} not found", err=True)
+
+
+# === Type Commands ===
+
+
+@type_app.command("list")
+def type_list(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List all object types."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+
+    with _db_session() as conn:
+        rows = conn.execute(
+            """SELECT id, title, summary FROM objects WHERE type_id = ? ORDER BY title""",
+            (BOOTSTRAP_IDS["type"],),
+        ).fetchall()
+
+    types = [dict(r) for r in rows]
+
+    if json_output:
+        typer.echo(json.dumps(types, indent=2))
+    else:
+        typer.echo("Types:")
+        for t in types:
+            typer.echo(f"  {t['title']}: {t.get('summary', '')}")
+
+
+@type_app.command("create")
+def type_create(
+    name: str = typer.Argument(..., help="Type name"),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Description"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Create a new object type."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
+
+    # Capitalize first letter but preserve rest of casing (e.g., "URL" stays "URL")
+    display_name = name[0].upper() + name[1:] if name else name
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        obj = obj_repo.create(
+            type_id=BOOTSTRAP_IDS["type"],
+            space_id=BOOTSTRAP_IDS["primitives/type"],
+            title=display_name,
+            summary=summary,
+        )
+
+    if json_output:
+        _output(obj, as_json=True)
+    else:
+        typer.echo(f"Created type: {display_name} ({obj['id']})")
+
+
+# === Space Commands ===
+
+
+@space_app.command("list")
+def space_list(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List all spaces (shows hierarchy)."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+
+    with _db_session() as conn:
+        rows = conn.execute(
+            """SELECT id, title, summary FROM objects WHERE type_id = ? ORDER BY summary, title""",
+            (BOOTSTRAP_IDS["space"],),
+        ).fetchall()
+
+    spaces = [dict(r) for r in rows]
+
+    if json_output:
+        typer.echo(json.dumps(spaces, indent=2))
+    else:
+        typer.echo("Spaces:")
+        for s in spaces:
+            typer.echo(f"  {s['title']}: {s.get('summary', '')}")
+
+
+@space_app.command("create")
+def space_create(
+    name: str = typer.Argument(..., help="Space name (use / for hierarchy, e.g. 'work/exobrain')"),
+    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Description"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Create a new space. Auto-creates parent spaces if needed."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+
+        # Create parent spaces if hierarchical
+        parts = name.split("/")
+        created = []
+        for i in range(len(parts)):
+            partial = "/".join(parts[: i + 1])
+            # Check if exists
+            existing = conn.execute(
+                "SELECT id FROM objects WHERE type_id = ? AND LOWER(summary) = ?",
+                (BOOTSTRAP_IDS["space"], partial.lower()),
+            ).fetchone()
+            if not existing:
+                display_title = parts[i].replace("-", " ").title()
+                obj = obj_repo.create(
+                    type_id=BOOTSTRAP_IDS["space"],
+                    space_id=BOOTSTRAP_IDS["primitives/space"],
+                    title=display_title,
+                    summary=partial,
+                )
+                created.append({"name": partial, "id": obj["id"]})
+
+    if json_output:
+        typer.echo(json.dumps(created, indent=2))
+    else:
+        if created:
+            for s in created:
+                typer.echo(f"Created space: {s['name']} ({s['id']})")
+        else:
+            typer.echo(f"Space '{name}' already exists.")
+
+
+# === File Commands ===
+
+
+@file_app.command("attach")
+def file_attach(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    path: str = typer.Argument(..., help="Path to file"),
+    role: str = typer.Option("primary", "--role", help="File role"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Attach a file to an object."""
+    from src.core.repository import FileRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+        file_repo = FileRepo(conn)
+
+        try:
+            result = file_repo.attach(obj_id, path, role=role)
+        except FileNotFoundError as e:
+            typer.echo(str(e), err=True)
+            raise typer.Exit(1)
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        typer.echo(f"Attached: {path} -> {obj_id[:12]}")
+        typer.echo(f"  SHA-256: {result['sha256']}")
+        typer.echo(f"  Size:    {result['size_bytes']:,} bytes")
+
+
+@file_app.command("detach")
+def file_detach(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Remove file attachment from an object."""
+    from src.core.repository import FileRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+        file_repo = FileRepo(conn)
+        removed = file_repo.detach(obj_id)
+
+    result = {"object_id": obj_id, "detached": removed}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        if removed:
+            typer.echo(f"Detached file from {obj_id[:12]}")
+        else:
+            typer.echo(f"No file attached to {obj_id[:12]}")
+
+
+@file_app.command("path")
+def file_path(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Print the full path to an attached file."""
+    from src.core.repository import FileRepo
+
+    with _db_session() as conn:
+        obj_id = _resolve_id(conn, id_or_prefix)
+        file_repo = FileRepo(conn)
+        full_path = file_repo.get_full_path(obj_id)
+
+    if json_output:
+        typer.echo(json.dumps({"object_id": obj_id, "path": str(full_path) if full_path else None}, indent=2))
+    else:
+        if full_path:
+            typer.echo(str(full_path))
+        else:
+            typer.echo(f"No file attached to {obj_id[:12]}", err=True)
+            raise typer.Exit(1)
+
+
+# === GraphRAG Commands (Phase 6; placeholder) ===
+
+
+@graphrag_app.command("stage")
+def graphrag_stage(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Stage SQLite objects as text files for GraphRAG indexing."""
     try:
-        result = run_index(incremental=incremental, fast=fast)
-        typer.echo(f"Status: {result['status']}")
-        if result.get("documents"):
-            typer.echo(f"Documents: {result['documents']}")
-    except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
+        from src.graphrag.adapter import stage_for_graphrag
+    except ImportError:
+        typer.echo("GraphRAG not installed. Install with: pip install -e '.[graphrag]'", err=True)
         raise typer.Exit(1)
 
+    with _db_session() as conn:
+        result = stage_for_graphrag(conn)
 
-@app.command()
-def rebuild():
-    """Full rebuild of the GraphRAG index."""
-    from src.graphrag import rebuild_index
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        typer.echo(f"Staged {result['count']} documents for GraphRAG")
 
-    typer.echo("Rebuilding index from scratch...")
-    typer.echo("This may take a while for large document sets.")
 
+@graphrag_app.command("index")
+def graphrag_index(
+    incremental: bool = typer.Option(True, "--incremental/--full", help="Incremental or full"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Run GraphRAG indexing on staged documents."""
     try:
-        result = rebuild_index()
-        typer.echo(f"Status: {result['status']}")
-        if result.get("documents"):
-            typer.echo(f"Documents: {result['documents']}")
-    except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
+        from src.graphrag import run_index
+    except ImportError:
+        typer.echo("GraphRAG not installed. Install with: pip install -e '.[graphrag]'", err=True)
         raise typer.Exit(1)
 
+    result = run_index(incremental=incremental)
 
-@app.command()
-def query(
-    q: str = typer.Argument(..., help="The query string"),
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        typer.echo(f"Index status: {result.get('status', 'unknown')}")
+
+
+@graphrag_app.command("query")
+def graphrag_query(
+    query: str = typer.Argument(..., help="Query text"),
     mode: str = typer.Option("global", "--mode", "-m", help="Query mode: global or local"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Query the GraphRAG index."""
-    from src.graphrag import QueryMode, query as run_query
+    try:
+        from src.graphrag import QueryMode, query as run_query
+    except ImportError:
+        typer.echo("GraphRAG not installed. Install with: pip install -e '.[graphrag]'", err=True)
+        raise typer.Exit(1)
 
     try:
         query_mode = QueryMode(mode.lower())
@@ -269,262 +975,12 @@ def query(
         typer.echo(f"Invalid mode: {mode}. Use 'global' or 'local'.", err=True)
         raise typer.Exit(1)
 
-    typer.echo(f"Running {query_mode.value} query...")
+    result = run_query(query, query_mode)
 
-    try:
-        result = run_query(q, query_mode)
-        typer.echo("\n" + "=" * 60)
-        typer.echo(result["response"])
-        typer.echo("=" * 60)
-    except Exception as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(1)
-
-
-@app.command()
-def capture(
-    content: Optional[str] = typer.Argument(None, help="Content to capture (or use stdin)"),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Optional title"),
-):
-    """Capture a new raw document."""
-    import sys
-
-    from src.core import OverlayRecord, append_overlay, write_raw_doc
-
-    # Read from stdin if no content provided
-    if content is None:
-        if sys.stdin.isatty():
-            typer.echo("Enter content (Ctrl+D to finish):")
-        content = sys.stdin.read()
-
-    if not content.strip():
-        typer.echo("Error: No content provided", err=True)
-        raise typer.Exit(1)
-
-    # Write raw document
-    doc = write_raw_doc(content)
-    typer.echo(f"Created: {doc.id}")
-
-    # Add title overlay if provided
-    if title:
-        record = OverlayRecord(
-            doc_id=doc.id,
-            source="human",
-            title=title,
-        )
-        append_overlay(record)
-        typer.echo(f"Added title: {title}")
-
-
-@app.command()
-def annotate(
-    doc_id: str = typer.Argument(..., help="Document ID to annotate"),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Set title"),
-    summary: Optional[str] = typer.Option(None, "--summary", "-s", help="Set summary"),
-    tag: Optional[list[str]] = typer.Option(None, "--tag", help="Add tag (repeatable)"),
-    entity: Optional[list[str]] = typer.Option(None, "--entity", "-e", help="Add entity (repeatable)"),
-    link: Optional[list[str]] = typer.Option(
-        None, "--link", "-l", help="Link to another doc ID (repeatable)"
-    ),
-    link_note: Optional[str] = typer.Option(
-        None, "--link-note", help="Note for the link (use with single --link)"
-    ),
-    source: str = typer.Option("human", "--source", help="Source: human, ai, system"),
-):
-    """Add annotations to an existing document.
-
-    Examples:
-        # Add a title
-        exobrain annotate <doc-id> --title "My Document"
-
-        # Add tags
-        exobrain annotate <doc-id> --tag project-x --tag important
-
-        # Link two documents
-        exobrain annotate <doc-id> --link <other-doc-id> --link-note "Related discussion"
-
-        # Add multiple annotations at once
-        exobrain annotate <doc-id> --title "Notes" --tag meeting --entity "John Smith"
-    """
-    from src.core import (
-        EntityItem,
-        LinkItem,
-        OverlayRecord,
-        TagItem,
-        append_overlay,
-        raw_doc_exists,
-    )
-
-    # Verify document exists
-    if not raw_doc_exists(doc_id):
-        typer.echo(f"Error: Document not found: {doc_id}", err=True)
-        raise typer.Exit(1)
-
-    # Validate source
-    if source not in ("human", "ai", "system", "import"):
-        typer.echo(f"Error: Invalid source: {source}", err=True)
-        raise typer.Exit(1)
-
-    # Check if any annotations provided
-    if not any([title, summary, tag, entity, link]):
-        typer.echo("Error: No annotations provided. Use --title, --tag, --entity, --link, or --summary")
-        raise typer.Exit(1)
-
-    # Build overlay record
-    tags = [TagItem(tag=t) for t in (tag or [])]
-    entities = [EntityItem(name=e) for e in (entity or [])]
-    links = []
-    if link:
-        for i, l in enumerate(link):
-            note = link_note if (len(link) == 1 and link_note) else None
-            links.append(LinkItem(doc_id=l, note=note))
-
-    record = OverlayRecord(
-        doc_id=doc_id,
-        source=source,
-        title=title,
-        summary=summary,
-        tags=tags if tags else None,
-        entities=entities if entities else None,
-        links=links if links else None,
-    )
-
-    append_overlay(record)
-
-    # Report what was added
-    typer.echo(f"Annotated: {doc_id}")
-    if title:
-        typer.echo(f"  Title: {title}")
-    if summary:
-        typer.echo(f"  Summary: {summary[:50]}..." if len(summary) > 50 else f"  Summary: {summary}")
-    if tags:
-        typer.echo(f"  Tags: {', '.join(t.tag for t in tags)}")
-    if entities:
-        typer.echo(f"  Entities: {', '.join(e.name for e in entities)}")
-    if links:
-        for lnk in links:
-            if lnk.note:
-                typer.echo(f"  Link: {lnk.doc_id} ; {lnk.note}")
-            else:
-                typer.echo(f"  Link: {lnk.doc_id}")
-
-
-# Import and add migrate subcommand
-from src.cli.commands.migrate import migrate as migrate_cmd
-
-
-@app.command()
-def migrate(
-    source: str = typer.Argument(
-        ...,
-        help="Source path: file, idea folder, or 'all' for entire ideas/ directory",
-    ),
-    dry_run: bool = typer.Option(
-        True,
-        "--dry-run/--execute",
-        help="Dry run shows what would be migrated without writing",
-    ),
-    transcripts_only: bool = typer.Option(
-        False,
-        "--transcripts-only",
-        "-t",
-        help="Only migrate transcript files",
-    ),
-    ideas_root: str = typer.Option(
-        "/ideas",
-        "--ideas-root",
-        help="Root directory for ideas/ (for 'all' migration)",
-    ),
-):
-    """Migrate content from ideas/ folder to ExoBrain.
-
-    Examples:
-        # Dry run on a single file
-        exobrain migrate ideas/0001-foo/transcripts/2026-01-07-bar.md
-
-        # Dry run on an idea space
-        exobrain migrate ideas/0001-foo
-
-        # Actually migrate (use --execute)
-        exobrain migrate ideas/0001-foo/transcripts/2026-01-07-bar.md --execute
-
-        # Migrate only transcripts from an idea space
-        exobrain migrate ideas/0001-foo --transcripts-only --execute
-    """
-    # Call the actual migrate function
-    from src.cli.commands.migrate import migrate as do_migrate
-
-    # We need to invoke it with the same args
-    # Since we're wrapping the typer command, just call the function directly
-    from pathlib import Path
-
-    from src.cli.commands.migrate import migrate_file, migrate_idea_space
-    from src.config import settings
-
-    source_path = Path(source)
-
-    if dry_run:
-        typer.echo("DRY RUN MODE (use --execute to actually migrate)\n")
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
     else:
-        settings.ensure_dirs()
-
-    results = []
-
-    if source == "all":
-        ideas_path = Path(ideas_root)
-        if not ideas_path.exists():
-            typer.echo(f"Error: Ideas root not found: {ideas_path}", err=True)
-            raise typer.Exit(1)
-
-        for idea_dir in sorted(ideas_path.iterdir()):
-            if idea_dir.is_dir() and idea_dir.name.startswith("0"):
-                typer.echo(f"Processing: {idea_dir.name}")
-                results.extend(migrate_idea_space(idea_dir, dry_run, transcripts_only))
-
-    elif source_path.is_file():
-        from src.cli.commands.migrate import extract_metadata_from_readme
-
-        idea_metadata = None
-        for parent in source_path.parents:
-            readme = parent / "README.md"
-            if readme.exists() and "ideas" in str(parent):
-                idea_metadata = extract_metadata_from_readme(readme)
-                break
-        results.append(migrate_file(source_path, dry_run, idea_metadata))
-
-    elif source_path.is_dir():
-        results.extend(migrate_idea_space(source_path, dry_run, transcripts_only))
-
-    else:
-        typer.echo(f"Error: Source not found: {source}", err=True)
-        raise typer.Exit(1)
-
-    # Print results
-    typer.echo("\nMigration Results:")
-    typer.echo("-" * 60)
-
-    success_count = 0
-    for r in results:
-        status = r.get("status", "unknown")
-        source_file = r.get("source", "unknown")
-
-        if status in ("success", "dry-run"):
-            success_count += 1
-            typer.echo(f"[{status.upper()}] {Path(source_file).name}")
-            typer.echo(f"  ID: {r.get('doc_id')}")
-            typer.echo(f"  Type: {r.get('file_type')}")
-            if r.get("title"):
-                typer.echo(f"  Title: {r['title']}")
-            if r.get("tags"):
-                typer.echo(f"  Tags: {', '.join(r['tags'])}")
-        else:
-            typer.echo(f"[ERROR] {source_file}: {r.get('error')}")
-
-    typer.echo("-" * 60)
-    typer.echo(f"Total: {len(results)} files, {success_count} successful")
-
-    if dry_run and success_count > 0:
-        typer.echo("\nTo execute this migration, add --execute flag")
+        typer.echo(result.get("response", "No response"))
 
 
 if __name__ == "__main__":

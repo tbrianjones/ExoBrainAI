@@ -7,15 +7,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy dependency files first for layer caching
+COPY pyproject.toml .
+COPY README.md .
+
+# Install dependencies only (from pyproject.toml)
+RUN pip install --no-cache-dir ".[graphrag,api,watcher,dev]"
 
 # Copy application code
 COPY . .
 
-# Install the package in development mode
-RUN pip install -e .
+# Re-install to pick up source code
+RUN pip install --no-cache-dir ".[graphrag,api,watcher,dev]"
 
-# Default command (can be overridden in docker-compose)
+# Default command (CLI; override in docker-compose)
 CMD ["python", "-m", "src.cli.main"]
