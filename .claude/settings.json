@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)"
+    ],
+    "deny": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(fetch *)",
+      "Bash(http *)",
+      "Bash(httpie *)",
+      "Bash(nc *)",
+      "Bash(ncat *)",
+      "Bash(netcat *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(sftp *)",
+      "Bash(rsync *://*)",
+      "Bash(telnet *)",
+      "Bash(ftp *)",
+      "Bash(*| curl *)",
+      "Bash(*| wget *)",
+      "Bash(*&& curl *)",
+      "Bash(*&& wget *)",
+      "Bash(*; curl *)",
+      "Bash(*; wget *)",
+      "Bash(* curl *)",
+      "Bash(* wget *)"
+    ]
+  }
+}
