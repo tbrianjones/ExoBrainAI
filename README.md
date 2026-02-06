@@ -83,7 +83,7 @@ docker compose exec exobrain exobrain capture "Design document" \
 ### Data Model
 
 Everything is an object. Objects have:
-- **Type** (Document, Note, Transcript, URL, or custom)
+- **Type** (Document, Note, Transcript, URL, Concept, Event, Person, Project, or custom)
 - **Space** (hierarchical organization: `work/exobrain`, `personal/journal`)
 - **Tags** (free-text labels)
 - **Links** (directed relationships to other objects)
@@ -177,7 +177,17 @@ docker compose exec exobrain exobrain project --cleanup
 docker compose exec exobrain exobrain tier status
 ```
 
-Projected files are organized by space, have YAML frontmatter, and support bidirectional sync (edits sync back to SQLite). Control which objects are projected:
+Projected files are organized by space, have YAML frontmatter, and support bidirectional sync. Edit projected files, then sync changes back:
+
+```bash
+# Sync all edited projected files back to SQLite
+docker compose exec exobrain exobrain sync
+
+# Sync a single file
+docker compose exec exobrain exobrain sync /data/projected/inbox/my-note-069xxx.md
+```
+
+Control which objects are projected:
 
 ```bash
 docker compose exec exobrain exobrain update <id> --always-project  # Force inclusion
@@ -235,6 +245,7 @@ Open this project in Claude Code to use:
 | `/generate-poem-view` | Generate poetry using Poetic Inquiry |
 | `/generate-academic-infographic-view` | Create academically rigorous infographic specs |
 | `/publish-quarto` | Publish view to ideas.tbrianjones.com |
+| `/test-system` | Run end-to-end integration test simulating a real user session |
 
 ## Services
 

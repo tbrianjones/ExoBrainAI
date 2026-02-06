@@ -56,6 +56,7 @@ All mutation operations are CLI commands. Every command supports `--json` output
 | **Types** | `type list`, `type create` | Object type definitions |
 | **Spaces** | `space list`, `space create` | Namespace management |
 | **Files** | `file attach`, `file detach`, `file path` | File attachment operations |
+| **Projection** | `project`, `project --cleanup`, `project --dry-run`, `sync`, `tier status` | Project objects to markdown files, sync edits back (ADR-007) |
 
 ### Output Modes
 
@@ -142,6 +143,8 @@ echo "My thought" | docker compose exec -T exobrain exobrain capture
 **GraphRAG adapter repository access.** The `stage_for_graphrag` adapter in `engine/src/graphrag/adapter.py` reads objects directly from the connection rather than going through `ObjectRepo`. This predates the v2 repository layer. When GraphRAG integration is next updated, the adapter should use repository methods for consistency.
 
 **Structured error types.** CLI commands currently raise `typer.Exit(1)` with ad-hoc error messages. A future improvement could define an `ExoError` hierarchy so that the exobrain skill can programmatically distinguish "not found" from "ambiguous prefix" from "FK constraint violation."
+
+**Projection and sync commands.** The `project`, `sync`, and `tier status` commands were added as part of the projection layer (ADR-007). The `sync` command exposes bidirectional sync from projected files back to SQLite, either for a single file or all projected files at once. See ADR-007 for details.
 
 **Link vocabulary.** Link relationships are unconstrained free text. Any string can be a relationship label. This provides flexibility but makes it harder to query or aggregate by relationship type. A future decision: should relationships be constrained to a vocabulary (like types are), or should the free-text approach continue? Document the choice when it matters.
 

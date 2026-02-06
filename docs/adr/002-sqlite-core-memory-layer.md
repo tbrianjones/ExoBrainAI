@@ -101,7 +101,17 @@ CREATE VIRTUAL TABLE objects_fts USING fts5(
 -- INSERT/UPDATE/DELETE triggers keep FTS5 index in sync with objects table
 ```
 
-Indexes on: `objects.type_id`, `objects.space_id`, `objects.created_at`, `object_tags.object_id`, `object_tags.tag_text`, `links.from_id`, `links.to_id`.
+Indexes on: `objects.type_id`, `objects.space_id`, `objects.created_at`, `objects.updated_at`, `objects(type_id, created_at DESC)`, `object_tags.object_id`, `object_tags.tag_text`, `links.from_id`, `links.to_id`.
+
+### Schema Additions (Migrations v2-v4)
+
+Subsequent migrations have added:
+
+- **v2:** Auto-update `updated_at` trigger (fires on any object modification)
+- **v3:** `access_log` table for future scoring; `projection_override` column on objects (ADR-007)
+- **v4:** Performance indexes (`updated_at`, composite `type_id, created_at DESC`); `source` column (values: `human`, `ai`, `import`, `system`); `status` column (values: `active`, `draft`, `archived`, `deprecated`); `is_system_object` column (marks bootstrap objects); link metadata columns (`source`, `confidence`)
+
+See ADR-009 for the migration strategy and data durability guarantees.
 
 ### Key Design Choices
 
@@ -111,7 +121,7 @@ Indexes on: `objects.type_id`, `objects.space_id`, `objects.created_at`, `object
 
 **UUIDv7 for IDs:** Time-sortable, globally unique. Bootstrap objects use hardcoded deterministic UUIDs so they are stable across installations. All user-created objects receive generated UUIDv7 values.
 
-**Self-referential bootstrap:** The `type` type object points to itself as its own type. Types, spaces, and tags are all objects in the `objects` table. Bootstrap creates 7 types (`type`, `space`, `tag`, `document`, `transcript`, `note`, `url`) and 5 spaces (`primitives`, `primitives/type`, `primitives/space`, `primitives/tag`, `inbox`). The `inbox` space is the default capture destination. Bootstrap is idempotent via `INSERT OR IGNORE` and uses hardcoded UUIDs.
+**Self-referential bootstrap:** The `type` type object points to itself as its own type. Types, spaces, and tags are all objects in the `objects` table. Bootstrap creates 11 types (`type`, `space`, `tag`, `document`, `transcript`, `note`, `url`, `concept`, `event`, `person`, `project`) and 5 spaces (`primitives`, `primitives/type`, `primitives/space`, `primitives/tag`, `inbox`). The `inbox` space is the default capture destination. Bootstrap is idempotent via `INSERT OR IGNORE` and uses hardcoded UUIDs. Bootstrap objects are marked with `is_system_object = 1` (migration v4) and filtered from user-facing list/search results.
 
 **Content column for searchable text:** Short content is stored inline in a TEXT column, indexed by FTS5. Files on disk hold binary evidence (PDFs, images, source documents). The `content` column is for text that should be queryable; the `files` table references raw evidence.
 
@@ -192,7 +202,7 @@ These items were identified during review but are not critical for the current s
 
 **Space hierarchy convention.** Spaces use a flat table with hierarchy encoded in the `summary` field (e.g., `work/exobrain`). The `space create` command auto-creates parents. This convention works but is not enforced at the schema level; it should be documented as an explicit design choice. A future migration could add a `parent_id` column if true hierarchical queries become necessary.
 
-**Tag normalization.** Tags are stored as-is with no normalization (no lowercasing, no trimming, no deduplication of case variants). `"Python"` and `"python"` are distinct tags. This is intentional for now; a normalization policy should be decided before the tag vocabulary grows large.
+**Tag normalization.** Tags are normalized to lowercase and trimmed on insert (implemented in `TagRepo.add()`). Duplicate detection is case-insensitive. This was implemented as part of the expert review fixes (commit a4edf85).
 
 **Deletion semantics for types/spaces.** Deleting a type or space object that other objects reference is blocked by foreign key constraints. The system prevents deleting bootstrap objects, but user-created types or spaces with dependents would fail silently. A future improvement could add a `--cascade` flag or a check-before-delete that reports dependents.
 

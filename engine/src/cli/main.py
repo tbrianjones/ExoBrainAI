@@ -986,6 +986,65 @@ def project(
                 typer.echo(f"  - {err}", err=True)
 
 
+@app.command()
+def sync(
+    file_path: Optional[str] = typer.Argument(None, help="Specific projected file to sync (or sync all)"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Sync changes from projected files back to the database.
+
+    If a file path is given, syncs that single file.
+    If no path is given, syncs all projected files that differ from the database.
+    """
+    from pathlib import Path
+
+    from src.config import settings
+    from src.core.projection import sync_from_file
+
+    results = []
+
+    with _db_session() as conn:
+        if file_path:
+            # Sync a single file
+            p = Path(file_path)
+            result = sync_from_file(conn, p)
+            results.append({
+                "file": str(p),
+                "success": result.success,
+                "message": result.message,
+                "object_id": result.object_id,
+            })
+        else:
+            # Sync all projected .md files
+            projected_dir = settings.projected_dir
+            if not projected_dir.exists():
+                typer.echo("No projected directory found. Run 'exobrain project' first.", err=True)
+                raise typer.Exit(1)
+
+            for md_file in sorted(projected_dir.rglob("*.md")):
+                if md_file.name == "CLAUDE.md":
+                    continue
+                result = sync_from_file(conn, md_file)
+                results.append({
+                    "file": str(md_file.relative_to(projected_dir)),
+                    "success": result.success,
+                    "message": result.message,
+                    "object_id": result.object_id,
+                })
+
+    if json_output:
+        typer.echo(json.dumps(results, indent=2))
+    else:
+        synced = sum(1 for r in results if r["success"])
+        failed = sum(1 for r in results if not r["success"])
+        typer.echo(f"Synced {synced} files")
+        if failed:
+            typer.echo(f"Failed: {failed}")
+            for r in results:
+                if not r["success"]:
+                    typer.echo(f"  {r['file']}: {r['message']}")
+
+
 @tier_app.command("status")
 def tier_status(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),

@@ -54,6 +54,7 @@ docker compose exec exobrain exobrain status
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
 | `/generate-new-view-command` | User wants to create a new specialized view generator |
 | `/publish-quarto` | Publish a view to ideas.tbrianjones.com |
+| `/test-system` | Run end-to-end integration test simulating a real user session |
 
 ## Agents
 
@@ -75,12 +76,13 @@ docker compose exec exobrain exobrain status
 
 ```
 ├── engine/                 # ExoBrain knowledge engine
-│   └── src/
-│       ├── core/           # DB, schema, models, bootstrap, repository
-│       ├── graphrag/       # GraphRAG config, indexer, querier, adapter
-│       ├── cli/            # Typer CLI commands
-│       ├── api/            # FastAPI routes
-│       └── watcher/        # File watcher
+│   ├── src/
+│   │   ├── core/           # DB, schema, models, bootstrap, repository, projection
+│   │   ├── graphrag/       # GraphRAG config, indexer, querier, adapter
+│   │   ├── cli/            # Typer CLI commands
+│   │   ├── api/            # FastAPI routes
+│   │   └── watcher/        # File watcher
+│   └── tests/              # pytest unit tests + fixtures/
 ├── .claude/
 │   ├── commands/           # User-invoked commands
 │   ├── agents/             # Autonomous subagents
@@ -95,6 +97,8 @@ docker compose exec exobrain exobrain status
 │   ├── poetry/             # Poetry generation frameworks
 │   ├── infographics/       # Infographic generation frameworks
 │   └── ...
+├── docs/
+│   └── adr/                # Architecture Decision Records (001-009)
 ├── site/                   # Quarto site for publishing
 ├── docker-compose.yml
 └── .env.example
@@ -149,9 +153,10 @@ Run via: `docker compose exec exobrain exobrain <command>`
 | `project` | Project objects to `$EXOBRAIN_DATA_DIR/projected/` as markdown |
 | `project --cleanup` | Recalculate scores, remove stale projections |
 | `project --dry-run` | Preview what would be projected |
+| `sync [FILE]` | Sync edited projected files back to SQLite (all files if no path given) |
 | `tier status` | Show projection statistics (counts, top scores, overrides) |
 
-Projected files have YAML frontmatter and support bidirectional sync. Edits to title, summary, content, and tags sync back to SQLite. Fields `id` and `space` are immutable.
+Projected files have YAML frontmatter and support bidirectional sync. Edit projected files, then run `sync` to write changes back to SQLite. Fields `id` and `space` are immutable.
 
 ### GraphRAG (Optional)
 
@@ -179,6 +184,26 @@ Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infogr
 - **Ellipses** for trailing off (use sparingly).
 - Preserve human's phrasing when it captures the idea.
 - Avoid flowery language.
+
+## Object Types
+
+Bootstrap types (always available): `Document`, `Note`, `Transcript`, `URL`, `Concept`, `Event`, `Person`, `Project`. Create custom types with `type create`.
+
+## Architecture Decision Records
+
+ADRs document key architectural choices. Read these before making significant changes:
+
+| ADR | Decision |
+|-----|----------|
+| [001](docs/adr/001-exobrain-v2-graphrag-memory-engine.md) | GraphRAG memory engine (superseded; deferred to Phase 6) |
+| [002](docs/adr/002-sqlite-core-memory-layer.md) | SQLite as core memory layer; repository pattern; FTS5 |
+| [003](docs/adr/003-exobrain-cli-architecture.md) | CLI as sole write interface |
+| [004](docs/adr/004-claude-code-first-ui.md) | Claude Code as first UI |
+| [005](docs/adr/005-api-layer-deferred.md) | API layer deferred until consumer exists |
+| [006](docs/adr/006-information-centric-computing-vision.md) | Information-centric computing vision |
+| [007](docs/adr/007-projection-layer-architecture.md) | Projection layer with hot tier scoring and bidirectional sync |
+| [008](docs/adr/008-agentic-testing-strategy.md) | Three-tier testing: unit tests + agentic integration + fixtures |
+| [009](docs/adr/009-schema-migration-and-data-durability.md) | Forward-only migrations; `init` safe on any DB state |
 
 ## Behavior
 

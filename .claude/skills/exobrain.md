@@ -168,7 +168,9 @@ The actual content body here. Fully editable.
 ```
 
 **Sync behavior:**
-- Edits to projected files automatically sync back to SQLite via watcher
+- Edit projected files, then run `exobrain sync` to write changes back to SQLite
+- Single file: `exobrain sync /data/projected/inbox/my-note-069xxx.md --json`
+- All files: `exobrain sync --json`
 - `id` and `space` are immutable; use CLI to change
 - `title`, `summary`, `tags`, `content` are mutable
 

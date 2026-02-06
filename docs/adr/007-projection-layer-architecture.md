@@ -143,7 +143,7 @@ exobrain update <id> --auto-project    # Use score-based (default)
 - `tags`
 - `projection_override`
 
-**Immutable fields (reject edit, log error):**
+**Immutable fields (reject edit, return error):**
 - `id` ; permanent identifier
 - `space` ; use CLI to move objects
 - `created` ; timestamp of creation
@@ -152,12 +152,27 @@ exobrain update <id> --auto-project    # Use score-based (default)
 - `updated` ; set by DB trigger
 - `type` ; changing type is complex; use CLI
 
+### Sync Mechanism
+
+Bidirectional sync is triggered explicitly via the `sync` CLI command (not via a file watcher). The workflow is:
+
+1. Edit a projected markdown file (content body, tags, title, summary)
+2. Run `exobrain sync` to write changes back to SQLite
+3. Run `exobrain project` to regenerate projected files from updated database state
+
+Single-file sync: `exobrain sync /data/projected/inbox/my-note-069xxx.md`
+Batch sync: `exobrain sync` (syncs all projected files)
+
+The `sync_from_file()` function in `projection.py` parses YAML frontmatter, validates immutable fields, updates mutable fields via the repository layer, and reconciles tags (adds new, removes deleted).
+
 ### CLI Commands
 
 ```bash
 exobrain project              # Run projection cycle
 exobrain project --dry-run    # Preview without writing
 exobrain project --cleanup    # Remove stale projections
+exobrain sync                 # Sync all projected files back to DB
+exobrain sync <file-path>     # Sync a single projected file
 exobrain tier status          # Show projection statistics
 ```
 
@@ -180,7 +195,7 @@ exobrain tier status          # Show projection statistics
 
 ### Neutral
 
-- **Watcher dependency.** Bidirectional sync requires file watcher running. Without it, edits are lost on next projection.
+- **Explicit sync model.** Sync is triggered by `exobrain sync`, not by a file watcher. Edits to projected files are not automatically synced; the user or agent must explicitly invoke sync before re-projecting. This is deliberate: explicit sync prevents accidental overwrites and makes the data flow visible.
 - **Configuration tuning.** Hot tier size and scoring weights may need adjustment per user.
 
 ## Agent Rules
@@ -189,7 +204,7 @@ exobrain tier status          # Show projection statistics
 
 2. **MUST** use CLI for mutations not supported by projection sync. Moving objects between spaces, deleting objects, and changing types require CLI commands.
 
-3. **MUST NOT** edit `id` or `space` fields in projected files. These are immutable; the watcher will reject the edit and log an error.
+3. **MUST NOT** edit `id` or `space` fields in projected files. These are immutable; `exobrain sync` will reject the edit and return an error.
 
 4. **SHOULD** run `exobrain project` after bulk imports or significant changes. This ensures projections reflect current state.
 
