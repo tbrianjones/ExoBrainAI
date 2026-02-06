@@ -32,7 +32,11 @@ All CLI commands use this prefix. Always use `--json` when you need to parse out
    - Record `db_size_bytes`
    - Verify `integrity` is `"ok"`
 3. Run `$EXEC doctor --json` and verify all checks pass
-4. Run `curl -s http://localhost:8420/health` and verify `status: "ok"`
+4. Check the API health endpoint from inside the container:
+   ```
+   docker compose exec exobrain python -c "import urllib.request, json; r=urllib.request.urlopen('http://localhost:8420/health'); d=json.loads(r.read()); print(json.dumps(d))"
+   ```
+   Verify `status: "ok"`
 
 **Report format**:
 ```
@@ -247,7 +251,11 @@ Phase 6: Update and Lifecycle
    - All checks should pass
    - No orphaned files
 
-3. Run `curl -s http://localhost:8420/status` and verify projection stats
+3. Check the API status endpoint from inside the container:
+   ```
+   docker compose exec exobrain python -c "import urllib.request, json; r=urllib.request.urlopen('http://localhost:8420/health'); d=json.loads(r.read()); print(json.dumps(d))"
+   ```
+   Verify API is responsive and consistent
 
 **Report format**:
 ```
