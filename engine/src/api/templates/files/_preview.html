@@ -1,0 +1,25 @@
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-700">{{ file_path }}</h3>
+        <span class="text-xs text-gray-500">{{ mime_type }} &middot; {{ size }}</span>
+    </div>
+
+    {% if frontmatter %}
+    <div class="mb-4 bg-gray-50 rounded p-3 text-xs font-mono">
+        <div class="text-gray-500 mb-1">Frontmatter:</div>
+        {% for key, value in frontmatter.items() %}
+        <div><span class="text-gray-500">{{ key }}:</span> <span class="text-gray-800">{{ value }}</span></div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if preview_type == 'html' %}
+    <div class="prose prose-sm max-w-none">{{ content | safe }}</div>
+    {% elif preview_type == 'image' %}
+    <img src="data:{{ mime_type }};base64,{{ content }}" alt="{{ file_path }}" class="max-w-full rounded">
+    {% elif preview_type == 'text' %}
+    <pre class="bg-gray-50 rounded p-4 text-xs overflow-x-auto whitespace-pre-wrap text-gray-800">{{ content }}</pre>
+    {% else %}
+    <div class="text-gray-500 text-sm">Preview not available for this file type.</div>
+    {% endif %}
+</div>

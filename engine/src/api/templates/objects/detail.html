@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ obj.title }} ; ExoBrain{% endblock %}
+{% block content %}
+<!-- Back link -->
+<a href="/ui/objects" class="text-sm text-blue-600 hover:text-blue-800 mb-4 inline-block">&larr; Back to objects</a>
+
+<!-- Header -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div class="flex items-start justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">{{ obj.title }}</h2>
+            <div class="flex items-center gap-3 mt-2 text-sm">
+                <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">{{ obj.type_name }}</span>
+                <span class="text-gray-500">{{ obj.space_name }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-4 text-xs text-gray-500 font-mono">
+        <div>ID: {{ obj.id }}</div>
+        <div>Created: {{ obj.created_at }}</div>
+        <div>Type ID: {{ obj.type_id }}</div>
+        <div>Updated: {{ obj.updated_at }}</div>
+    </div>
+</div>
+
+<!-- Summary -->
+{% if obj.summary %}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-2">Summary</h3>
+    <p class="text-gray-600">{{ obj.summary }}</p>
+</div>
+{% endif %}
+
+<!-- Content -->
+{% if content_html %}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Content</h3>
+    <div class="prose prose-sm max-w-none text-gray-800">{{ content_html | safe }}</div>
+</div>
+{% endif %}
+
+<!-- Tags -->
+{% if tags %}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Tags</h3>
+    <div class="flex flex-wrap gap-2">
+        {% for tag in tags %}
+        <span class="inline-block px-2.5 py-1 text-sm rounded-full bg-gray-100 text-gray-700">{{ tag }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Links -->
+{% if links %}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Links</h3>
+    <table class="w-full text-sm">
+        <thead class="border-b border-gray-200">
+            <tr>
+                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Direction</th>
+                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Relationship</th>
+                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Object</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for link in links %}
+            <tr>
+                <td class="py-2">
+                    <span class="text-xs px-1.5 py-0.5 rounded {% if link.direction == 'outgoing' %}bg-green-100 text-green-700{% else %}bg-purple-100 text-purple-700{% endif %}">
+                        {{ link.direction }}
+                    </span>
+                </td>
+                <td class="py-2 text-gray-600">{{ link.relationship }}</td>
+                <td class="py-2">
+                    {% if link.direction == 'outgoing' %}
+                    <a href="/ui/objects/{{ link.to_id }}" class="text-blue-600 hover:text-blue-800">{{ link.to_title }}</a>
+                    {% else %}
+                    <a href="/ui/objects/{{ link.from_id }}" class="text-blue-600 hover:text-blue-800">{{ link.from_title }}</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- File attachment -->
+{% if file_info %}
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">File Attachment</h3>
+    <table class="text-sm">
+        <tr><td class="pr-4 py-1 text-gray-500">Path:</td><td class="font-mono text-xs">{{ file_info.path }}</td></tr>
+        <tr><td class="pr-4 py-1 text-gray-500">MIME:</td><td class="font-mono text-xs">{{ file_info.mime_type }}</td></tr>
+        <tr><td class="pr-4 py-1 text-gray-500">Size:</td><td class="font-mono text-xs">{{ file_info.size_bytes }} bytes</td></tr>
+        <tr><td class="pr-4 py-1 text-gray-500">SHA256:</td><td class="font-mono text-xs">{{ file_info.sha256 }}</td></tr>
+    </table>
+
+    {% if file_content_html %}
+    <div class="mt-4 border-t border-gray-200 pt-4">
+        <h4 class="text-xs font-medium text-gray-500 mb-2">Preview</h4>
+        <div class="prose prose-sm max-w-none">{{ file_content_html | safe }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

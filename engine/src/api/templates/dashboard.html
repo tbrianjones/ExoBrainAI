@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Dashboard ; ExoBrain{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
+<div id="stats"
+     hx-get="/ui-api/stats"
+     hx-trigger="load, every 30s"
+     hx-swap="innerHTML">
+    <div class="text-gray-500 text-sm">Loading stats...</div>
+</div>
+{% endblock %}

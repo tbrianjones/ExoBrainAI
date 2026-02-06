@@ -28,6 +28,7 @@ docker compose exec exobrain exobrain status
 
 **Endpoints:**
 - API: http://localhost:8420
+- Web UI: http://localhost:8420/ui/
 - Logs: http://localhost:9998 (Dozzle)
 
 **Data locations:**
@@ -204,6 +205,7 @@ ADRs document key architectural choices. Read these before making significant ch
 | [007](docs/adr/007-projection-layer-architecture.md) | Projection layer with hot tier scoring and bidirectional sync |
 | [008](docs/adr/008-agentic-testing-strategy.md) | Three-tier testing: unit tests + agentic integration + fixtures |
 | [009](docs/adr/009-schema-migration-and-data-durability.md) | Forward-only migrations; `init` safe on any DB state |
+| [010](docs/adr/010-web-ui-architecture.md) | Read-only web UI with Jinja2 + HTMX + Tailwind; integrated into FastAPI on `/ui/` |
 
 ## Behavior
 

@@ -1,11 +1,16 @@
 """ExoBrain HTTP API entry point."""
 
+from pathlib import Path
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from src import __version__
 from src.api.routes import admin, docs, health, query
+from src.api.routes import ui, ui_api
 from src.config import settings
 
 app = FastAPI(
@@ -23,11 +28,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Jinja2 templates and static files for the web UI
+_templates_dir = Path(__file__).parent / "templates"
+_static_dir = Path(__file__).parent / "static"
+
+app.state.templates = Jinja2Templates(directory=str(_templates_dir))
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(query.router, prefix="/query", tags=["query"])
 app.include_router(docs.router, prefix="/doc", tags=["documents"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+
+# Web UI routers
+app.include_router(ui.router, prefix="/ui", tags=["ui"])
+app.include_router(ui_api.router, prefix="/ui-api", tags=["ui-api"])
 
 
 def main():

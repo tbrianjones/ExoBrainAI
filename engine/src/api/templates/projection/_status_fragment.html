@@ -1,0 +1,94 @@
+<!-- Summary cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Eligible Objects</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ status.total_objects }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Projected</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ status.projected_count }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Hot Tier Limit</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ status.hot_tier_limit }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Files on Disk</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ status.currently_projected_files }}</div>
+    </div>
+</div>
+
+<!-- Top by score -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Top Objects by Score</h3>
+    <table class="w-full text-sm">
+        <thead class="border-b border-gray-200">
+            <tr>
+                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Rank</th>
+                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">ID</th>
+                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Title</th>
+                <th class="text-right py-2 text-xs font-medium text-gray-500 uppercase">Score</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for item in status.top_5_by_score %}
+            <tr>
+                <td class="py-2 text-gray-500">{{ loop.index }}</td>
+                <td class="py-2 font-mono text-xs text-gray-500">{{ item.id }}</td>
+                <td class="py-2 text-gray-900">{{ item.title }}</td>
+                <td class="py-2 text-right font-mono text-gray-700">{{ item.score }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="py-4 text-center text-gray-500">No scored objects.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Overrides -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Always Project</h3>
+        {% if status.always_project %}
+        <ul class="text-sm space-y-1">
+            {% for item in status.always_project %}
+            <li class="flex items-center gap-2">
+                <span class="font-mono text-xs text-gray-500">{{ item.id }}</span>
+                <span class="text-gray-700">{{ item.title }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-gray-500">No overrides.</p>
+        {% endif %}
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Never Project</h3>
+        {% if status.never_project %}
+        <ul class="text-sm space-y-1">
+            {% for item in status.never_project %}
+            <li class="flex items-center gap-2">
+                <span class="font-mono text-xs text-gray-500">{{ item.id }}</span>
+                <span class="text-gray-700">{{ item.title }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-gray-500">No overrides.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Projected files listing -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Projected Files</h3>
+    {% if projected_files %}
+    <ul class="text-sm space-y-0.5 max-h-64 overflow-y-auto">
+        {% for f in projected_files %}
+        <li class="font-mono text-xs text-gray-600 py-0.5">{{ f }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-gray-500">No projected files on disk.</p>
+    {% endif %}
+</div>

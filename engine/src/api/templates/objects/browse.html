@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Objects ; ExoBrain{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-900 mb-6">Objects</h2>
+
+<!-- Filters -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <div class="flex flex-wrap gap-4 items-end">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
+            <input type="text" name="q" placeholder="Full-text search..."
+                   class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   hx-get="/ui-api/objects"
+                   hx-trigger="keyup changed delay:300ms"
+                   hx-target="#object-list"
+                   hx-include="[name='type'],[name='space'],[name='tag']">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
+            <select name="type"
+                    class="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    hx-get="/ui-api/objects"
+                    hx-trigger="change"
+                    hx-target="#object-list"
+                    hx-include="[name='q'],[name='space'],[name='tag']">
+                <option value="">All types</option>
+                {% for t in types %}
+                <option value="{{ t.title }}">{{ t.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Space</label>
+            <select name="space"
+                    class="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    hx-get="/ui-api/objects"
+                    hx-trigger="change"
+                    hx-target="#object-list"
+                    hx-include="[name='q'],[name='type'],[name='tag']">
+                <option value="">All spaces</option>
+                {% for s in spaces %}
+                <option value="{{ s.summary or s.title }}">{{ s.summary or s.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Tag</label>
+            <select name="tag"
+                    class="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    hx-get="/ui-api/objects"
+                    hx-trigger="change"
+                    hx-target="#object-list"
+                    hx-include="[name='q'],[name='type'],[name='space']">
+                <option value="">All tags</option>
+                {% for t in tags %}
+                <option value="{{ t.tag_text }}">{{ t.tag_text }} ({{ t.count }})</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- Object list -->
+<div id="object-list"
+     hx-get="/ui-api/objects"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="text-gray-500 text-sm">Loading objects...</div>
+</div>
+{% endblock %}

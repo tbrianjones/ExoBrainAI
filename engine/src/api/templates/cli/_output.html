@@ -1,0 +1,13 @@
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+    <div class="flex items-center justify-between mb-2">
+        <span class="font-mono text-xs text-gray-500">$ exobrain {{ command }}</span>
+        <span class="text-xs {% if success %}text-green-600{% else %}text-red-600{% endif %}">
+            {% if success %}OK{% else %}Error{% endif %}
+        </span>
+    </div>
+    {% if success %}
+    <pre class="bg-gray-900 text-gray-100 rounded p-4 text-xs overflow-x-auto whitespace-pre-wrap">{{ output }}</pre>
+    {% else %}
+    <div class="bg-red-50 text-red-700 rounded p-3 text-sm">{{ output }}</div>
+    {% endif %}
+</div>
