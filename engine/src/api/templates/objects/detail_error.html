@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ error }} ; ExoBrain{% endblock %}
+{% block content %}
+<a href="/ui/objects" class="text-sm text-blue-600 hover:text-blue-800 mb-4 inline-block">&larr; Back to objects</a>
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+    <h2 class="text-xl font-bold text-gray-900 mb-2">{{ error }}</h2>
+    <p class="text-gray-500 text-sm">The requested object could not be loaded.</p>
+</div>
+{% endblock %}

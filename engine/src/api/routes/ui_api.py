@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import html as html_mod
 import json
 import mimetypes
 from pathlib import Path
 
-import markdown as md
 import yaml
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from src.api.routes.ui import _render_markdown
 from src.config import settings
 from src.core.db import db_session, get_db_path
 from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
+
+MAX_LIMIT = 200
 
 router = APIRouter()
 
@@ -97,6 +100,10 @@ async def list_objects(
     """Return object list as an HTML fragment."""
     templates = _templates(request)
 
+    # Cap limit to prevent unbounded queries
+    limit = min(max(1, limit), MAX_LIMIT)
+    offset = max(0, offset)
+
     db_path = get_db_path()
     if not db_path.exists():
         return HTMLResponse("<div class='text-red-600'>Database not found.</div>")
@@ -106,9 +113,9 @@ async def list_objects(
         tag_repo = TagRepo(conn)
 
         if q.strip():
-            objects = obj_repo.search(q.strip(), limit=limit)
-            # search doesn't support offset natively; slice
-            objects = objects[offset : offset + limit]
+            # Fetch enough results to cover the offset + page
+            objects = obj_repo.search(q.strip(), limit=offset + limit)
+            objects = objects[offset:]
         else:
             objects = obj_repo.list(
                 type_name=type or None,
@@ -118,9 +125,19 @@ async def list_objects(
                 offset=offset,
             )
 
-        # Attach tags to each object
-        for obj in objects:
-            obj["tags"] = tag_repo.list_for_object(obj["id"])
+        # Batch fetch tags (avoids N+1 query)
+        if objects:
+            obj_ids = [obj["id"] for obj in objects]
+            placeholders = ",".join("?" for _ in obj_ids)
+            tag_rows = conn.execute(
+                f"SELECT object_id, tag_text FROM object_tags WHERE object_id IN ({placeholders}) ORDER BY tag_text",
+                obj_ids,
+            ).fetchall()
+            tags_by_obj: dict[str, list[str]] = {}
+            for row in tag_rows:
+                tags_by_obj.setdefault(row["object_id"], []).append(row["tag_text"])
+            for obj in objects:
+                obj["tags"] = tags_by_obj.get(obj["id"], [])
 
     ctx = {
         "request": request,
@@ -232,7 +249,7 @@ async def file_preview(request: Request, root: str = "files", path: str = ""):
                 if len(parts) >= 3:
                     ctx["frontmatter"] = yaml.safe_load(parts[1])
                     body = parts[2].strip()
-                    ctx["content"] = md.markdown(body, extensions=["fenced_code", "tables"])
+                    ctx["content"] = _render_markdown(body)
                     ctx["preview_type"] = "html"
                     return templates.TemplateResponse("files/_preview.html", ctx)
         except Exception:
@@ -242,7 +259,7 @@ async def file_preview(request: Request, root: str = "files", path: str = ""):
     if mime_type and ("markdown" in mime_type or target.suffix == ".md"):
         try:
             raw = target.read_text(encoding="utf-8", errors="replace")
-            ctx["content"] = md.markdown(raw, extensions=["fenced_code", "tables"])
+            ctx["content"] = _render_markdown(raw)
             ctx["preview_type"] = "html"
         except Exception:
             ctx["preview_type"] = None
@@ -293,7 +310,7 @@ async def projection_status_fragment(request: Request):
             from src.core.projection import get_tier_status
             status = get_tier_status(conn)
         except Exception as e:
-            return HTMLResponse(f"<div class='text-red-600'>Error: {e}</div>")
+            return HTMLResponse(f"<div class='text-red-600'>Error: {html_mod.escape(str(e))}</div>")
 
     # List projected files on disk
     projected_files = []
@@ -314,39 +331,43 @@ async def projection_status_fragment(request: Request):
 # CLI console (read-only commands only)
 # ---------------------------------------------------------------------------
 
-# Whitelist of allowed commands (read-only only)
-ALLOWED_CLI_COMMANDS = {
-    "status",
-    "doctor",
-    "version",
-    "get",
-    "list",
-    "search",
-    "tag list",
-    "type list",
-    "space list",
-    "tier status",
-    "project --dry-run",
-}
+# Commands allowed with arbitrary trailing arguments (read-only)
+_COMMANDS_WITH_ARGS = {"get", "search", "list"}
+
+# Commands allowed as exact matches only (no trailing args)
+_EXACT_COMMANDS = {"status", "doctor", "version"}
+
+# Two-word commands allowed as exact matches only
+_EXACT_TWO_WORD = {"tag list", "type list", "space list", "tier status", "project --dry-run",
+                   "link list", "file path"}
+
+# Two-word commands that allow a trailing argument
+_TWO_WORD_WITH_ARGS = {"link list", "file path"}
 
 
 def _is_command_allowed(cmd: str) -> bool:
     """Check if a CLI command is in the read-only whitelist."""
-    cmd = cmd.strip()
+    parts = cmd.strip().split()
+    if not parts:
+        return False
 
-    # Exact match
-    if cmd in ALLOWED_CLI_COMMANDS:
+    # Exact single-word commands
+    if len(parts) == 1 and parts[0] in (_EXACT_COMMANDS | _COMMANDS_WITH_ARGS):
         return True
 
-    # Commands with arguments: "get <id>", "search <query>", "list ..."
-    first_word = cmd.split()[0] if cmd.split() else ""
-    if first_word in {"get", "search", "list"}:
+    # Single-word commands with arguments: "get <id>", "search <query>", "list ..."
+    if parts[0] in _COMMANDS_WITH_ARGS:
         return True
 
-    # "tag list", "type list", "space list", "tier status" with no extra args
-    first_two = " ".join(cmd.split()[:2]) if len(cmd.split()) >= 2 else ""
-    if first_two in {"tag list", "type list", "space list", "tier status", "project --dry-run"}:
-        return True
+    # Two-word commands
+    if len(parts) >= 2:
+        two_word = f"{parts[0]} {parts[1]}"
+        # Exact two-word (no extra args)
+        if len(parts) == 2 and two_word in _EXACT_TWO_WORD:
+            return True
+        # Two-word with trailing argument
+        if two_word in _TWO_WORD_WITH_ARGS:
+            return True
 
     return False
 

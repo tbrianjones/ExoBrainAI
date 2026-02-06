@@ -11,8 +11,8 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for obj in objects %}
-            <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/ui/objects/{{ obj.id }}'">
-                <td class="px-4 py-2 font-mono text-xs text-gray-500">{{ obj.id[:8] }}</td>
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2 font-mono text-xs text-gray-500"><a href="/ui/objects/{{ obj.id }}" class="hover:text-blue-600">{{ obj.id[:8] }}</a></td>
                 <td class="px-4 py-2">
                     <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">{{ obj.type_name }}</span>
                 </td>
@@ -44,7 +44,7 @@
     <div class="flex gap-2">
         {% if offset > 0 %}
         <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
-                hx-get="/ui-api/objects?offset={{ offset - limit }}&limit={{ limit }}"
+                hx-get="/ui-api/objects?offset={{ [offset - limit, 0] | max }}&limit={{ limit }}"
                 hx-target="#object-list"
                 hx-include="[name='q'],[name='type'],[name='space'],[name='tag']">
             Previous

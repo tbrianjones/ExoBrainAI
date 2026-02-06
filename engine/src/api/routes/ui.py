@@ -1,5 +1,7 @@
 """Full-page UI route handlers (all GET, read-only)."""
 
+import html
+
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
@@ -8,6 +10,62 @@ from src.core.db import db_session, get_db_path
 from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
 
 router = APIRouter()
+
+# HTML tags allowed in rendered markdown output
+_SAFE_TAGS = {
+    "h1", "h2", "h3", "h4", "h5", "h6", "p", "br", "hr",
+    "ul", "ol", "li", "dl", "dt", "dd",
+    "strong", "em", "b", "i", "u", "s", "del", "ins", "mark", "sub", "sup",
+    "a", "code", "pre", "blockquote", "kbd", "var", "samp",
+    "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption",
+    "img", "figure", "figcaption",
+    "div", "span", "abbr", "details", "summary",
+}
+_SAFE_ATTRS = {"a": {"href", "title"}, "img": {"src", "alt", "title"}, "td": {"align"}, "th": {"align"}}
+
+import re
+
+_TAG_RE = re.compile(r"<(/?)(\w+)([^>]*)(/?)>", re.DOTALL)
+_ATTR_RE = re.compile(r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|(\S+))')
+
+
+def _sanitize_html(raw_html: str) -> str:
+    """Strip dangerous HTML tags and attributes from rendered markdown.
+
+    Allows safe formatting tags; removes script, iframe, event handlers, etc.
+    """
+    def _replace_tag(m: re.Match) -> str:
+        slash = m.group(1)
+        tag = m.group(2).lower()
+        attrs_str = m.group(3)
+        self_close = m.group(4)
+
+        if tag not in _SAFE_TAGS:
+            return ""
+
+        # Filter attributes
+        allowed = _SAFE_ATTRS.get(tag, set())
+        safe_attrs = []
+        for attr_m in _ATTR_RE.finditer(attrs_str):
+            attr_name = attr_m.group(1).lower()
+            attr_val = attr_m.group(2) or attr_m.group(3) or attr_m.group(4) or ""
+            if attr_name in allowed:
+                # Block javascript: URIs
+                if attr_name in ("href", "src") and attr_val.strip().lower().startswith("javascript:"):
+                    continue
+                safe_attrs.append(f'{attr_name}="{html.escape(attr_val)}"')
+
+        attr_str = (" " + " ".join(safe_attrs)) if safe_attrs else ""
+        return f"<{slash}{tag}{attr_str}{self_close}>"
+
+    return _TAG_RE.sub(_replace_tag, raw_html)
+
+
+def _render_markdown(content: str) -> str:
+    """Render markdown to sanitized HTML."""
+    import markdown as md
+    raw_html = md.markdown(content, extensions=["fenced_code", "tables"])
+    return _sanitize_html(raw_html)
 
 
 def _templates(request: Request):
@@ -57,14 +115,13 @@ async def objects_browse(request: Request):
 @router.get("/objects/{obj_id}", response_class=HTMLResponse)
 async def object_detail(request: Request, obj_id: str):
     """Single object detail page."""
-    import markdown as md
-
     templates = _templates(request)
     ctx = _base_context(request, "objects")
 
     db_path = get_db_path()
     if not db_path.exists():
-        return HTMLResponse("<h1>Database not found</h1>", status_code=503)
+        ctx["error"] = "Database not found"
+        return templates.TemplateResponse("objects/detail_error.html", ctx, status_code=503)
 
     with db_session(db_path) as conn:
         obj_repo = ObjectRepo(conn)
@@ -77,7 +134,8 @@ async def object_detail(request: Request, obj_id: str):
             # Try prefix match
             obj = obj_repo.get_by_prefix(obj_id)
         if obj is None:
-            return HTMLResponse("<h1>Object not found</h1>", status_code=404)
+            ctx["error"] = "Object not found"
+            return templates.TemplateResponse("objects/detail_error.html", ctx, status_code=404)
 
         ctx["obj"] = obj
         ctx["tags"] = tag_repo.list_for_object(obj["id"])
@@ -95,18 +153,14 @@ async def object_detail(request: Request, obj_id: str):
                 if full_path and full_path.exists():
                     raw = full_path.read_text(encoding="utf-8", errors="replace")
                     if "markdown" in mime:
-                        ctx["file_content_html"] = md.markdown(
-                            raw, extensions=["fenced_code", "tables"]
-                        )
+                        ctx["file_content_html"] = _render_markdown(raw)
                     else:
-                        ctx["file_content_html"] = f"<pre>{raw}</pre>"
+                        ctx["file_content_html"] = f"<pre>{html.escape(raw)}</pre>"
 
-        # Render content as markdown
+        # Render content as sanitized markdown
         content = obj.get("content") or ""
         if content:
-            ctx["content_html"] = md.markdown(
-                content, extensions=["fenced_code", "tables"]
-            )
+            ctx["content_html"] = _render_markdown(content)
         else:
             ctx["content_html"] = None
 

@@ -271,3 +271,137 @@ class TestCLIConsole:
         resp = client.get("/ui-api/cli/run?cmd=tier+status")
         assert resp.status_code == 200
         assert "not allowed" not in resp.text.lower()
+
+    def test_disallowed_tag_add(self, client):
+        """tag add is a write command; should be rejected."""
+        resp = client.get("/ui-api/cli/run?cmd=tag+add+someid+sometag")
+        assert resp.status_code == 200
+        assert "not allowed" in resp.text.lower()
+
+    def test_disallowed_project_without_dry_run(self, client):
+        """project without --dry-run is a write command."""
+        resp = client.get("/ui-api/cli/run?cmd=project")
+        assert resp.status_code == 200
+        assert "not allowed" in resp.text.lower()
+
+    def test_disallowed_project_cleanup(self, client):
+        """project --dry-run with extra args should be rejected."""
+        resp = client.get("/ui-api/cli/run?cmd=project+--dry-run+--cleanup")
+        assert resp.status_code == 200
+        assert "not allowed" in resp.text.lower()
+
+    def test_allowed_link_list(self, client):
+        """link list with an ID argument should be allowed."""
+        resp = client.get("/ui-api/cli/run?cmd=link+list+00000000")
+        assert resp.status_code == 200
+        assert "not allowed" not in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Whitelist unit tests
+# ---------------------------------------------------------------------------
+
+class TestCommandWhitelist:
+    """Unit tests for _is_command_allowed."""
+
+    def test_exact_commands(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("status") is True
+        assert _is_command_allowed("doctor") is True
+        assert _is_command_allowed("version") is True
+
+    def test_commands_with_args(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("get 069abc") is True
+        assert _is_command_allowed("search quantum computing") is True
+        assert _is_command_allowed("list --type Note") is True
+        assert _is_command_allowed("list --type Note --tag test") is True
+
+    def test_two_word_exact(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("tag list") is True
+        assert _is_command_allowed("type list") is True
+        assert _is_command_allowed("space list") is True
+        assert _is_command_allowed("tier status") is True
+        assert _is_command_allowed("project --dry-run") is True
+
+    def test_two_word_with_args(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("link list 069abc") is True
+        assert _is_command_allowed("file path 069abc") is True
+
+    def test_write_commands_blocked(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("capture test") is False
+        assert _is_command_allowed("delete someid --yes") is False
+        assert _is_command_allowed("update someid --title x") is False
+        assert _is_command_allowed("tag add someid test") is False
+        assert _is_command_allowed("tag remove someid test") is False
+        assert _is_command_allowed("link create a b rel") is False
+        assert _is_command_allowed("link remove 1") is False
+        assert _is_command_allowed("file attach someid /tmp/f") is False
+        assert _is_command_allowed("file detach someid") is False
+
+    def test_project_without_dry_run_blocked(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("project") is False
+        assert _is_command_allowed("project --cleanup") is False
+        assert _is_command_allowed("project --dry-run --cleanup") is False
+
+    def test_empty_blocked(self):
+        from src.api.routes.ui_api import _is_command_allowed
+        assert _is_command_allowed("") is False
+        assert _is_command_allowed("   ") is False
+
+
+# ---------------------------------------------------------------------------
+# HTML sanitization
+# ---------------------------------------------------------------------------
+
+class TestHTMLSanitization:
+    """Test that markdown rendering strips dangerous HTML."""
+
+    def test_script_tag_stripped(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown("<script>alert('xss')</script>")
+        assert "<script>" not in result
+        assert "</script>" not in result
+
+    def test_safe_tags_preserved(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown("**bold** and *italic*")
+        assert "<strong>" in result
+        assert "<em>" in result
+
+    def test_links_preserved(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown("[test](https://example.com)")
+        assert 'href="https://example.com"' in result
+
+    def test_javascript_uri_blocked(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown('[click](javascript:alert(1))')
+        assert "javascript:" not in result
+
+    def test_iframe_stripped(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown('<iframe src="https://evil.com"></iframe>')
+        assert "<iframe" not in result
+
+    def test_img_onerror_stripped(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown('<img src="x" onerror="alert(1)">')
+        assert "onerror" not in result
+
+
+# ---------------------------------------------------------------------------
+# Limit cap
+# ---------------------------------------------------------------------------
+
+class TestLimitCap:
+
+    def test_limit_capped(self, populated_client):
+        """Requesting limit=99999 should be capped."""
+        client, data = populated_client
+        resp = client.get("/ui-api/objects?limit=99999")
+        assert resp.status_code == 200
