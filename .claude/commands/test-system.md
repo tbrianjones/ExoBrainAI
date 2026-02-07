@@ -17,16 +17,46 @@ All test objects are tagged with `_system-test` for easy identification and clea
 Before starting, set up:
 
 ```bash
-EXEC="docker compose exec exobrain exobrain"
+EXEC="docker compose exec exobrain-test exobrain"
 ```
 
 All CLI commands use this prefix. Always use `--json` when you need to parse output programmatically. Use human-readable output when reporting to the user.
+
+## Phase 0: Test Environment Setup
+
+**Goal**: Start an isolated test container with a fresh, disposable data directory.
+
+1. Create the test data directory if it doesn't exist:
+   ```bash
+   mkdir -p test-data
+   ```
+
+2. Start the test container:
+   ```bash
+   docker compose --profile test up -d exobrain-test
+   ```
+
+3. Wait for the container to become healthy. Poll `docker compose ps` until `exobrain-test` shows `healthy` (up to 60 seconds, checking every 5 seconds). If it doesn't become healthy, report the error and abort.
+
+4. Initialize a fresh database:
+   ```bash
+   docker compose exec exobrain-test exobrain init
+   ```
+
+**Report format**:
+```
+Phase 0: Test Environment Setup
+  Directory:  [OK] test-data/ created
+  Container:  [OK] exobrain-test started (profile: test)
+  Health:     [OK] healthy after Ns
+  Init:       [OK] database initialized with bootstrap objects
+```
 
 ## Phase 1: System Health Check
 
 **Goal**: Verify the system is running and healthy.
 
-1. Run `docker compose ps` and verify the `exobrain` service is healthy
+1. Run `docker compose ps` and verify the `exobrain-test` service is healthy
 2. Run `$EXEC status --json` and capture the baseline:
    - Record `object_count`, `tag_count`, `link_count`, `file_count`
    - Record `db_size_bytes`
@@ -34,14 +64,14 @@ All CLI commands use this prefix. Always use `--json` when you need to parse out
 3. Run `$EXEC doctor --json` and verify all checks pass
 4. Check the API health endpoint from inside the container:
    ```
-   docker compose exec exobrain python -c "import urllib.request, json; r=urllib.request.urlopen('http://localhost:8420/health'); d=json.loads(r.read()); print(json.dumps(d))"
+   docker compose exec exobrain-test python -c "import urllib.request, json; r=urllib.request.urlopen('http://localhost:8420/health'); d=json.loads(r.read()); print(json.dumps(d))"
    ```
    Verify `status: "ok"`
 
 **Report format**:
 ```
 Phase 1: System Health Check
-  Docker:     [OK] exobrain is healthy
+  Docker:     [OK] exobrain-test is healthy
   Status:     [OK] 25 objects, 11 tags, 2 links, 0 files
   Doctor:     [OK] integrity passed, FTS5 passed, no orphans
   API:        [OK] health endpoint responsive
@@ -172,7 +202,7 @@ Phase 4: Links and Relationships
 
 2. **Verify files on disk**: Check that projected files exist for test objects
    ```
-   docker compose exec exobrain find /data/projected -name "*_system-test*" -o -name "*associative*" -o -name "*hot-tier*"
+   docker compose exec exobrain-test find /data/projected -name "*_system-test*" -o -name "*associative*" -o -name "*hot-tier*"
    ```
    Or list all projected files and check for test objects.
 
@@ -253,7 +283,7 @@ Phase 6: Update and Lifecycle
 
 3. Check the API status endpoint from inside the container:
    ```
-   docker compose exec exobrain python -c "import urllib.request, json; r=urllib.request.urlopen('http://localhost:8420/health'); d=json.loads(r.read()); print(json.dumps(d))"
+   docker compose exec exobrain-test python -c "import urllib.request, json; r=urllib.request.urlopen('http://localhost:8420/health'); d=json.loads(r.read()); print(json.dumps(d))"
    ```
    Verify API is responsive and consistent
 
@@ -270,13 +300,13 @@ Phase 7: Integrity Verification
 
 ## Phase 8: Cleanup
 
-**Goal**: Remove test artifacts, leaving the system clean.
+**Goal**: Remove test artifacts and optionally tear down the test container.
 
 Ask the user before proceeding:
 
-> "All 7 test phases passed. Would you like me to clean up the test objects (tagged _system-test), or leave them in the system?"
+> "All 8 test phases passed (Phase 0 through 7). Would you like me to clean up? Options: (1) Clean up test objects only, (2) Full teardown (stop container + remove test data), (3) Skip cleanup."
 
-If cleanup requested:
+**Option 1 or 2; Object cleanup**:
 
 1. List all `_system-test` objects: `$EXEC list --tag _system-test --json`
 2. Delete each test object: `$EXEC delete <id> --yes`
@@ -285,13 +315,26 @@ If cleanup requested:
 5. Run `$EXEC project --cleanup` to remove stale projected files
 6. Run `$EXEC status` for final count
 
+**Option 2 only; Container teardown**:
+
+7. Stop the test container and remove its cache volume:
+   ```bash
+   docker compose --profile test down -v
+   ```
+8. Remove the local test data directory:
+   ```bash
+   rm -rf test-data/
+   ```
+
 **Report format**:
 ```
 Phase 8: Cleanup
   Deleted 5 test objects
   Deleted 2 test spaces
   Cleaned up projected files
-  Final status: 25 objects (back to baseline)
+  Container:  [stopped/kept]
+  Test data:  [removed/kept]
+  Final status: back to baseline (or container removed)
 ```
 
 ## Final Summary
@@ -301,6 +344,7 @@ After all phases, present a summary table:
 ```
 ExoBrain Integration Test Results
 ==================================
+Phase 0: Test Environment   [PASS]
 Phase 1: System Health      [PASS]
 Phase 2: Knowledge Capture  [PASS]
 Phase 3: Search/Discovery   [PASS]
@@ -310,6 +354,7 @@ Phase 6: Update/Lifecycle   [PASS]
 Phase 7: Integrity Check    [PASS]
 Phase 8: Cleanup            [PASS/SKIP]
 
+Container:       exobrain-test (isolated)
 Objects created: 5
 Links created:   4
 Projections:     verified

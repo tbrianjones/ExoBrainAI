@@ -46,7 +46,9 @@ Adopt a three-tier testing strategy:
 
 ### Test Isolation Pattern
 
-All agentic test objects are tagged with `_system-test`. This allows:
+The `/test-system` command uses **structural isolation**: a dedicated `exobrain-test` Docker Compose service (under the `test` profile) that mounts a separate, disposable data directory (`./test-data/`) instead of the production Dropbox-synced directory. The service name itself is the safety mechanism; there is no mode flag that could be accidentally misconfigured. The test container runs on port 8421 alongside the production container on 8420.
+
+Within the test container, all agentic test objects are also tagged with `_system-test`. This allows:
 - Filtering: `exobrain list --tag _system-test` shows only test artifacts
 - Cleanup: delete all tagged objects after verification
 - Coexistence: tests run alongside real data without collision
@@ -100,6 +102,7 @@ All agentic test objects are tagged with `_system-test`. This allows:
 docker compose exec exobrain python -m pytest tests/ -v
 
 # Tier 2: Agentic integration (watchable, after significant changes)
+# Uses isolated exobrain-test container (docker compose --profile test)
 # In Claude Code:
 /test-system
 ```

@@ -42,6 +42,9 @@ site/.quarto/
 /graphrag/
 /overlay/
 
+# Test data (agentic integration test instance)
+/test-data/
+
 # Graph exports
 gephi*
 *.graphml

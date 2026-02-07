@@ -2,6 +2,7 @@
 #
 # Core services: exobrain (CLI + API)
 # Optional profiles:
+#   - test: Isolated test instance (separate data dir, port 8421)
 #   - graphrag: Ollama, Gephi Lite, watcher
 #   - docker: Docker-based Ollama (CPU only; native recommended)
 
@@ -33,6 +34,34 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+    command: ["python", "-m", "src.api.main"]
+
+  # Isolated test instance (only starts with --profile test)
+  exobrain-test:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    container_name: exobrain-test
+    profiles:
+      - test
+    ports:
+      - "127.0.0.1:${EXOBRAIN_TEST_API_PORT:-8421}:8420"
+    environment:
+      - EXOBRAIN_DATA_DIR=/data
+      - EXOBRAIN_CACHE_DIR=/cache
+      - EXOBRAIN_USER=Test User
+      - EXOBRAIN_USER_EMAIL=test@example.com
+      - EXOBRAIN_OLLAMA_MODE=${OLLAMA_MODE:-native}
+    volumes:
+      - ${EXOBRAIN_TEST_DATA_DIR:-./test-data}:/data
+      - exobrain_test_cache:/cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8420/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: "no"
     command: ["python", "-m", "src.api.main"]
 
   # File watcher (optional; GraphRAG profile)
@@ -102,3 +131,4 @@ services:
 volumes:
   ollama_models:
   exobrain_cache:
+  exobrain_test_cache:
