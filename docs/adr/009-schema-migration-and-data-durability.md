@@ -104,6 +104,7 @@ The primary backup mechanism is Dropbox sync of `$EXOBRAIN_DATA_DIR`. Additional
 | 002 | 2 | Auto-update `updated_at` trigger |
 | 003 | 3 | Access log table, `projection_override` column |
 | 004 | 4 | Performance indexes, `source`, `status`, `is_system_object` columns, link metadata |
+| 005 | 5 | Move space paths from `summary` to `title`; space `title` is now the hierarchical path |
 
 ## Agent Rules
 

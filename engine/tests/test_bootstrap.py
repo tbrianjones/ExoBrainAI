@@ -167,7 +167,7 @@ class TestNewBootstrapTypes:
             "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["primitives/relationship"],)
         ).fetchone()
         assert row is not None
-        assert row["title"] == "Relationships"
+        assert row["title"] == "primitives/relationship"
 
 
 class TestBootstrapSystemMarker:

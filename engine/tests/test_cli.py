@@ -428,7 +428,7 @@ class TestUpdateCommand:
         result = runner.invoke(app, ["update", obj_id, "--space", "inbox", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["space_name"] == "Inbox"
+        assert data["space_name"] == "inbox"
 
 
 # ============================================================
@@ -494,8 +494,8 @@ class TestSpaceCommands:
     def test_space_list(self, initialized_db):
         result = runner.invoke(app, ["space", "list"])
         assert result.exit_code == 0
-        assert "Inbox" in result.output
-        assert "Primitives" in result.output
+        assert "inbox" in result.output
+        assert "primitives" in result.output
 
     def test_space_create(self, initialized_db):
         result = runner.invoke(app, ["space", "create", "work"])
@@ -527,7 +527,7 @@ class TestCaptureDefaults:
         result = runner.invoke(app, ["capture", "Inbox test", "--title", "Inbox Default", "--json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["space_name"] == "Inbox"
+        assert data["space_name"] == "inbox"
 
     def test_capture_with_explicit_space(self, initialized_db):
         # Create a space first
@@ -537,7 +537,7 @@ class TestCaptureDefaults:
         ])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["space_name"] == "Work"
+        assert data["space_name"] == "work"
 
 
 # ============================================================

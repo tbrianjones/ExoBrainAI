@@ -39,7 +39,7 @@
                     hx-include="[name='q'],[name='type'],[name='tag']">
                 <option value="">All spaces</option>
                 {% for s in spaces %}
-                <option value="{{ s.summary or s.title }}">{{ s.summary or s.title }}</option>
+                <option value="{{ s.title }}">{{ s.title }}</option>
                 {% endfor %}
             </select>
         </div>

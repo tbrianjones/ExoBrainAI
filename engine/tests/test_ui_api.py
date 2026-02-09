@@ -394,6 +394,31 @@ class TestHTMLSanitization:
         assert "onerror" not in result
 
 
+class TestFrontmatterStripping:
+    """Test that YAML frontmatter is stripped before markdown rendering."""
+
+    def test_frontmatter_stripped(self):
+        from src.api.routes.ui import _strip_frontmatter
+        text = "---\ntitle: Hello\npublished: true\n---\n\n# Heading"
+        assert _strip_frontmatter(text) == "# Heading"
+
+    def test_no_frontmatter_unchanged(self):
+        from src.api.routes.ui import _strip_frontmatter
+        text = "# Just a heading\n\nSome content."
+        assert _strip_frontmatter(text) == text
+
+    def test_unclosed_frontmatter_unchanged(self):
+        from src.api.routes.ui import _strip_frontmatter
+        text = "---\ntitle: Hello\nno closing delimiter"
+        assert _strip_frontmatter(text) == text
+
+    def test_render_markdown_strips_frontmatter(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown("---\ntitle: Test\n---\n\n**bold**")
+        assert "<strong>bold</strong>" in result
+        assert "title" not in result
+
+
 # ---------------------------------------------------------------------------
 # Limit cap
 # ---------------------------------------------------------------------------

@@ -353,10 +353,10 @@ class TestGenerateClaudeMd:
         """CLAUDE.md lists objects in the space."""
         conn = sample_objects["conn"]
 
-        # The primitives space has summary="System primitive objects"
-        content = generate_claude_md(conn, "System primitive objects")
+        # The primitives space title is "primitives" (path as title)
+        content = generate_claude_md(conn, "primitives")
 
-        assert "# System primitive objects" in content
+        assert "# primitives" in content
         assert "Alpha Document" in content
         assert "Beta Document" in content
         assert "Gamma Note" in content

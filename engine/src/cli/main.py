@@ -864,12 +864,11 @@ def space_create(
             # Check if exists via repository
             existing = obj_repo.resolve_space_by_name(partial)
             if not existing:
-                display_title = parts[i].replace("-", " ").title()
                 obj = obj_repo.create(
                     type_id=BOOTSTRAP_IDS["space"],
                     space_id=BOOTSTRAP_IDS["primitives/space"],
-                    title=display_title,
-                    summary=partial,
+                    title=partial,
+                    summary=summary if partial == name else None,
                     source="human",
                 )
                 created.append({"name": partial, "id": obj["id"]})

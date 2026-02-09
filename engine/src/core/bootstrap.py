@@ -50,12 +50,12 @@ BOOTSTRAP_TYPES = [
 
 # Initial space definitions
 BOOTSTRAP_SPACES = [
-    ("primitives", "Primitives", "System primitive objects"),
-    ("primitives/type", "Types", "Type definitions"),
-    ("primitives/space", "Spaces", "Space definitions"),
-    ("primitives/tag", "Tags", "Tag definitions"),
-    ("primitives/relationship", "Relationships", "Standard relationship type vocabulary"),
-    ("inbox", "Inbox", "Default space for user captures"),
+    ("primitives", "primitives", "System primitive objects"),
+    ("primitives/type", "primitives/type", "Type definitions"),
+    ("primitives/space", "primitives/space", "Space definitions"),
+    ("primitives/tag", "primitives/tag", "Tag definitions"),
+    ("primitives/relationship", "primitives/relationship", "Standard relationship type vocabulary"),
+    ("inbox", "inbox", "Default space for user captures"),
 ]
 
 # Standard relationship vocabulary for use with links

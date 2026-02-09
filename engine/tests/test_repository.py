@@ -83,7 +83,7 @@ class TestObjectRepoGet:
         assert obj is not None
         assert obj["title"] == "Alpha Document"
         assert obj["type_name"] == "Document"
-        assert obj["space_name"] == "Primitives"
+        assert obj["space_name"] == "primitives"
 
     def test_get_nonexistent_returns_none(self, bootstrapped_db):
         repo = ObjectRepo(bootstrapped_db)
@@ -888,7 +888,7 @@ class TestSearchExcludesBootstrap:
 
     def test_search_does_not_return_bootstrap_spaces(self, bootstrapped_db):
         repo = ObjectRepo(bootstrapped_db)
-        results = repo.search("Inbox")
+        results = repo.search("inbox")
         bootstrap_ids = set(BOOTSTRAP_IDS.values())
         for r in results:
             assert r["id"] not in bootstrap_ids

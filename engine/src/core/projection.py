@@ -210,14 +210,13 @@ def get_projection_candidates(
 def _get_space_path(conn: sqlite3.Connection, space_id: str) -> str:
     """Get the full path for a space (e.g., 'work/exobrain').
 
-    Uses the space's summary field which contains the path.
+    The space's title field contains the hierarchical path.
     """
     row = conn.execute(
-        "SELECT title, summary FROM objects WHERE id = ?", (space_id,)
+        "SELECT title FROM objects WHERE id = ?", (space_id,)
     ).fetchone()
     if row:
-        # Summary contains the path (e.g., "work/exobrain"), title is display name
-        return row["summary"] or row["title"]
+        return row["title"]
     return "inbox"
 
 
@@ -320,10 +319,10 @@ def generate_claude_md(conn: sqlite3.Connection, space_path: str) -> str:
            JOIN objects t ON o.type_id = t.id
            JOIN objects s ON o.space_id = s.id
            LEFT JOIN object_tags ot ON o.id = ot.object_id
-           WHERE s.summary = ? OR s.title = ?
+           WHERE s.title = ?
            GROUP BY o.id
            ORDER BY o.updated_at DESC""",
-        (space_path, space_path),
+        (space_path,),
     ).fetchall()
 
     lines = [

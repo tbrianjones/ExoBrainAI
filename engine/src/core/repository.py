@@ -146,8 +146,8 @@ class ObjectRepo:
             conditions.append("o.is_system_object = 0")
 
         if space_name:
-            conditions.append("(LOWER(s.title) = ? OR LOWER(s.summary) = ?)")
-            params.extend([space_name.lower(), space_name.lower()])
+            conditions.append("LOWER(s.title) = ?")
+            params.append(space_name.lower())
 
         if tag:
             query += " JOIN object_tags ot ON o.id = ot.object_id"
@@ -308,7 +308,7 @@ class ObjectRepo:
 
         rows = self.conn.execute(
             """SELECT id, title, summary FROM objects
-               WHERE type_id = ? ORDER BY summary, title""",
+               WHERE type_id = ? ORDER BY title""",
             (BOOTSTRAP_IDS["space"],),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -324,13 +324,13 @@ class ObjectRepo:
         return row["id"] if row else None
 
     def resolve_space_by_name(self, name: str) -> str | None:
-        """Resolve a space name to its ID. Matches title or summary."""
+        """Resolve a space name (path) to its ID. Matches title."""
         from src.core.bootstrap import BOOTSTRAP_IDS
 
         row = self.conn.execute(
             """SELECT id FROM objects WHERE type_id = ?
-               AND (LOWER(title) = ? OR LOWER(summary) = ?)""",
-            (BOOTSTRAP_IDS["space"], name.lower(), name.lower()),
+               AND LOWER(title) = ?""",
+            (BOOTSTRAP_IDS["space"], name.lower()),
         ).fetchone()
         return row["id"] if row else None
 

@@ -139,9 +139,26 @@ ALTER TABLE links ADD COLUMN source TEXT DEFAULT 'human';
 ALTER TABLE links ADD COLUMN confidence REAL DEFAULT 1.0;
 """
 
+MIGRATION_005 = """
+-- Bootstrap spaces: set title to their canonical path
+UPDATE objects SET title = 'primitives' WHERE id = '00000000-0000-7000-8000-000000000101';
+UPDATE objects SET title = 'primitives/type' WHERE id = '00000000-0000-7000-8000-000000000102';
+UPDATE objects SET title = 'primitives/space' WHERE id = '00000000-0000-7000-8000-000000000103';
+UPDATE objects SET title = 'primitives/tag' WHERE id = '00000000-0000-7000-8000-000000000104';
+UPDATE objects SET title = 'primitives/relationship' WHERE id = '00000000-0000-7000-8000-000000000105';
+UPDATE objects SET title = 'inbox' WHERE id = '00000000-0000-7000-8000-000000000201';
+
+-- User-created spaces: move path from summary to title, clear summary
+UPDATE objects SET title = summary, summary = NULL
+WHERE type_id = '00000000-0000-7000-8000-000000000002'
+AND id NOT LIKE '00000000%'
+AND summary IS NOT NULL;
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
     (3, "Access log and projection override", MIGRATION_003),
     (4, "Performance indexes, source, status, is_system_object, link metadata", MIGRATION_004),
+    (5, "Move space paths from summary to title", MIGRATION_005),
 ]

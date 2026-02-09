@@ -61,10 +61,22 @@ def _sanitize_html(raw_html: str) -> str:
     return _TAG_RE.sub(_replace_tag, raw_html)
 
 
+def _strip_frontmatter(text: str) -> str:
+    """Strip YAML frontmatter (--- delimited block at start) from text."""
+    if not text.startswith("---"):
+        return text
+    # Find closing ---
+    end = text.find("\n---", 3)
+    if end == -1:
+        return text
+    return text[end + 4:].lstrip("\n")
+
+
 def _render_markdown(content: str) -> str:
-    """Render markdown to sanitized HTML."""
+    """Render markdown to sanitized HTML, stripping any YAML frontmatter."""
     import markdown as md
-    raw_html = md.markdown(content, extensions=["fenced_code", "tables"])
+    clean = _strip_frontmatter(content)
+    raw_html = md.markdown(clean, extensions=["fenced_code", "tables"])
     return _sanitize_html(raw_html)
 
 
@@ -157,7 +169,13 @@ async def object_detail(request: Request, obj_id: str):
                     else:
                         ctx["file_content_html"] = f"<pre>{html.escape(raw)}</pre>"
 
-        # Render content as sanitized markdown
+        # Render summary and content as sanitized markdown
+        summary = obj.get("summary") or ""
+        if summary:
+            ctx["summary_html"] = _render_markdown(summary)
+        else:
+            ctx["summary_html"] = None
+
         content = obj.get("content") or ""
         if content:
             ctx["content_html"] = _render_markdown(content)
