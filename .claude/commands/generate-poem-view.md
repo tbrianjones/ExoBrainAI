@@ -23,11 +23,15 @@ This skill corrects these failures by treating poetry as Poetic Inquiry: you are
 
 Ask what material to transmute:
 
-1. **From an idea space**: "Which idea folder? I'll load the README, transcripts, and assets."
+1. **From an idea space**: "Which ExoBrain space? I'll load all the projected content."
+   - List spaces: `docker compose exec exobrain exobrain space list --json` (filter for `ideas/`)
+   - Refresh projection: `docker compose exec exobrain exobrain project`
+   - Read `.env` to determine `EXOBRAIN_DATA_DIR`
+   - Read all `.md` files from `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/`
 2. **Current conversation**: "I'll work from what we've discussed so far."
 3. **Paste text**: "Paste or describe what you want transmuted into verse."
 
-If working from an idea space, load context first (README, all transcripts, all assets) before proceeding.
+If working from an idea space, load context first (all projected files) before proceeding.
 
 ---
 
@@ -229,10 +233,21 @@ Verify no forbidden words slipped through. If they did, replace them.
 
 ## PHASE 7: Output
 
-Present the final poem. Then write it to the idea space if one was specified.
+Present the final poem. Then save it to ExoBrain if an idea space was specified.
 
-### File Location
-`ideas/NNNN-name/views/poem-[short-title].md`
+### Save to ExoBrain
+
+Pipe the content via stdin:
+```bash
+echo "[content]" | docker compose exec -T exobrain exobrain capture \
+  --title "[Poem Title]" \
+  --type document \
+  --space "ideas/[space-name]" \
+  --tag view --tag poem --tag draft \
+  --always-project \
+  --json
+```
+Then refresh: `docker compose exec exobrain exobrain project`
 
 ### File Format
 
@@ -313,17 +328,17 @@ Before finalizing, verify:
 
 ## Example Workflow
 
-**User**: "Generate a poem from the transcript in ideas/0003-memory-palace"
+**User**: "Generate a poem from the consciousness idea space"
 
 **You**:
-1. Load: README, all transcripts, all assets from 0003-memory-palace
+1. Load: All projected files from `ideas/consciousness-in-the-age-of-ai` space
 2. Ask: "What form? Free verse is default. And rhyme preference: none, light, moderate, or full?"
 3. Show extraction: core themes, concrete nouns, voice, key phrases
 4. Propose structure, get approval
 5. Draft following all constraints
 6. Show revision notes
 7. Present final poem
-8. Write to `ideas/0003-memory-palace/views/poem-[title].md`
+8. Save to ExoBrain via `exobrain capture --type document --space "ideas/consciousness-in-the-age-of-ai" --tag view --tag poem --tag draft --always-project`
 
 ---
 

@@ -51,11 +51,17 @@ exobrain version
 # Capture a new object (content as argument)
 exobrain capture "My thought about X" --title "Insight on X" --type note --tag important --json
 
-# Capture from stdin
+# Capture from stdin (preferred for content with YAML frontmatter or special chars)
 echo "Long content..." | exobrain capture --title "Title" --type document --json
 
 # Capture with file attachment
 exobrain capture "Description" --title "Report" --type document --file /path/to/report.pdf --json
+
+# Capture with custom creation date (ISO 8601)
+exobrain capture "Backdated note" --title "Old Note" --type note --created-at "2026-01-07T00:00:00.000Z" --json
+
+# Capture and always include in projection
+exobrain capture "Important idea" --title "Key Insight" --type note --always-project --json
 
 # Get full object detail
 exobrain get <id-or-prefix> --json
@@ -260,6 +266,10 @@ Bootstrap types (always available):
 - `transcript` ; conversation or interview transcripts
 - `note` ; short thoughts or observations
 - `url` ; web resource references
+- `concept` ; abstract ideas and theories
+- `event` ; events and occurrences
+- `person` ; people
+- `project` ; projects and initiatives
 
 ## Spaces
 
@@ -296,7 +306,49 @@ $EXOBRAIN_DATA_DIR/
 
 ## Integration Workflow
 
-When using ExoBrain during ideation or content generation:
+### The Hybrid Pattern (Commands and Agents)
+
+Commands and agents use a hybrid approach: projected files for reads, CLI for writes.
+
+**Read path** (loading context from an idea space):
+```bash
+# 1. Refresh projection for the target space
+docker compose exec exobrain exobrain project
+
+# 2. Read .env to find EXOBRAIN_DATA_DIR (host path)
+# 3. Read projected files from disk:
+#    $EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/*.md
+#    Each file has YAML frontmatter (id, type, space, title, summary, tags, dates) + content body
+#    Auto-generated CLAUDE.md index in each space directory
+```
+
+**Write path** (creating new objects):
+```bash
+# Pipe content via stdin to avoid issues with YAML frontmatter (---) in content
+echo "[content]" | docker compose exec -T exobrain exobrain capture \
+  --title "Title" \
+  --type document \
+  --space "ideas/space-name" \
+  --tag view --tag draft \
+  --always-project \
+  --json
+
+# Refresh projection so new object is visible as a file
+docker compose exec exobrain exobrain project
+```
+
+**Edit path** (modifying existing objects):
+- Edit the projected markdown file directly
+- The file watcher (2-second debounce) auto-syncs changes back to SQLite
+- Immutable fields (`id`, `space`) are protected; sync rejects changes to these
+
+**Space discovery**:
+```bash
+docker compose exec exobrain exobrain space list --json
+# Filter for ideas/ spaces
+```
+
+### General Workflow
 
 1. **Capture** the raw content: `exobrain capture "..." --type note --tag ideation`
 2. **Search** for related content: `exobrain search "related topic" --json`

@@ -17,22 +17,23 @@ When invoked:
    - If no, ask: "What idea do you want to explore?"
 
 2. **Determine if new or existing**
-   - Scan `ideas/` folder for existing idea spaces
+   - List existing idea spaces: `docker compose exec exobrain exobrain space list --json`
+   - Filter for spaces under `ideas/` (summary starts with "ideas/")
    - Ask: "Is this a new idea, or does it connect to one of these existing spaces?"
-   - List existing ideas if helpful
    - If new: proceed to create structure
-   - If existing: load that idea's context (README, transcripts, assets)
+   - If existing: load that idea's context from projected files
 
 3. **If new idea: Run /instantiate-idea**
-   - The instantiate-idea command will create the folder structure
-   - Since you're in the same thread with full context, it can generate the README automatically
+   - The instantiate-idea command will create the ExoBrain space and concept object
+   - Since you're in the same thread with full context, it can generate the concept content automatically
    - After structure is created, continue with the interview
 
-4. **If existing idea: Load context**
-   - Read the idea's README.md
-   - Scan transcripts/ for existing ideation
-   - Scan assets/ for relevant entities
-   - Note what views already exist
+4. **If existing idea: Load context from projection**
+   - Refresh projection: `docker compose exec exobrain exobrain project`
+   - Read `.env` to determine `EXOBRAIN_DATA_DIR`
+   - Read the space's CLAUDE.md index: `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/CLAUDE.md`
+   - Read all projected `.md` files in the space directory for full context
+   - These contain all transcripts, views, and the concept README with YAML frontmatter
 
 ## The Conversation
 
@@ -61,12 +62,12 @@ You are a podcast producer interviewing a guest. Your job is to draw out the ide
 
 ### Interview Guidelines
 
-- **One question at a time**—never stack questions
-- **Listen first**—your follow-ups should respond to what they said
-- **Go deeper before going wider**—exhaust a thread before moving on
-- **Maximum 10 questions/topics**—respect their time
-- **Be curious, not leading**—draw out their thinking, don't impose yours
-- **Note emotional cues**—enthusiasm, hesitation, uncertainty are signals
+- **One question at a time**; never stack questions
+- **Listen first**; your follow-ups should respond to what they said
+- **Go deeper before going wider**; exhaust a thread before moving on
+- **Maximum 10 questions/topics**; respect their time
+- **Be curious, not leading**; draw out their thinking, don't impose yours
+- **Note emotional cues**; enthusiasm, hesitation, uncertainty are signals
 
 ### Sample Question Types
 
@@ -79,23 +80,21 @@ You are a podcast producer interviewing a guest. Your job is to draw out the ide
 
 ## After the Conversation
 
-1. **CRITICAL: Spin up transcript-generator agent**
+1. **CRITICAL: Run /generate-transcript**
    - Tell the user: "Let me capture this conversation as a transcript so the ideas persist."
-   - Spin up the `transcript-generator` agent using the Task tool
-   - Pass it the output path: `ideas/NNNN-name/transcripts/YYYY-MM-DD-topic.md`
-   - The agent has access to the conversation context and will capture everything
+   - Run `/generate-transcript` which will capture the conversation to ExoBrain
+   - The transcript agents create ExoBrain objects via CLI (not files)
    - Do not skip this step. The transcript is the raw material for everything else.
 
 2. **Check for emerging views**:
    - If during the conversation a concrete output surfaced (blog post, technical overview, video script, essay, etc.), ask the user:
      - "It sounds like you're envisioning a [type of content]. Want me to spin up the view-generator to create that now?"
-   - If yes, spin up the `view-generator` agent using the Task tool
-   - Pass it the idea folder path
+   - If yes, run `/generate-view`
 
 ## Continuing Existing Ideas
 
 When working on an existing idea:
-- Reference what you learned from previous transcripts
+- Reference what you learned from the projected files (previous transcripts, views, concept README)
 - Build on established themes and open questions
 - The new transcript will add to the idea's context for future work
 - Each ideation session deepens the raw material available for views

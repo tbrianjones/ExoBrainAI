@@ -10,26 +10,20 @@ Create production content within an idea space. If working from an existing idea
 
 ## CRITICAL: Load Context First
 
-Before any interaction with the user, you MUST load the entire idea folder:
+Before any interaction with the user, you MUST load the idea's content from ExoBrain's projected files:
 
-1. **Read the README.md** in the idea folder to understand:
-   - What the idea is about
-   - Its origin and open questions
-   - Any planned views
+1. **Refresh projection**: `docker compose exec exobrain exobrain project`
 
-2. **Load ALL transcripts** from `transcripts/`:
-   - Read every `.md` file in the transcripts folder
-   - These contain the raw ideation—the source material for views
-   - Pay attention to the Ideas & Themes sections and Full Transcript
+2. **Read `.env`** to determine `EXOBRAIN_DATA_DIR`
 
-3. **Load ALL assets** from `assets/`:
-   - Read every file in the assets folder
-   - These are structured entities: characters, settings, concepts, objects
-   - Assets inform voice, details, and consistency
+3. **Read the space's CLAUDE.md index**: `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/CLAUDE.md`
+   - This provides an overview of all objects in the space
 
-4. **Scan existing views** in `views/`:
-   - See what's already been created
-   - Understand the voice and style patterns already established
+4. **Read ALL projected files** in the space directory: `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/*.md`
+   - Each file has YAML frontmatter (id, type, space, title, summary, tags, dates) + markdown content
+   - Transcripts contain the raw ideation; the source material for views
+   - Concept objects (tagged `idea-readme`) contain the idea summary and open questions
+   - Existing views show voice and style patterns already established
 
 Only AFTER loading this context should you proceed with the user interaction.
 
@@ -69,14 +63,25 @@ When writing prose:
 5. **Generate content**:
    - Write from the outline
    - Apply voice and style settings
-   - Draw on transcript material—use the human's own words when powerful
+   - Draw on transcript material; use the human's own words when powerful
    - Keep outline and content as separate sections
 
-6. **Write the file** to `ideas/NNNN-name/views/[type]-[title].md`
+6. **Save to ExoBrain**:
+   Pipe the content via stdin to avoid CLI issues with frontmatter:
+   ```bash
+   echo "[content]" | docker compose exec -T exobrain exobrain capture \
+     --title "[Title]" \
+     --type document \
+     --space "ideas/[space-name]" \
+     --tag view --tag [content-type] --tag draft \
+     --always-project \
+     --json
+   ```
+   Then refresh: `docker compose exec exobrain exobrain project`
 
 ## File Structure
 
-The file begins with YAML frontmatter:
+The content should begin with YAML frontmatter:
 
 ```yaml
 ---
@@ -133,19 +138,13 @@ Generate 10 of each, ordered by importance/relevancy:
 
 Views can be edited at either layer:
 
-**Outline changed → Update content**:
-- Reprocess content to match new structure
-- Preserve prose that still fits
+**Edit the projected file directly**: The file watcher auto-syncs changes back to SQLite. Edit the markdown file at `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/{filename}.md`.
 
-**Content changed → Update outline**:
-- Regenerate outline to reflect new structure
+**Outline changed -> Update content**: Reprocess content to match new structure. Preserve prose that still fits.
 
-Always make minimal changes—preserve what works.
+**Content changed -> Update outline**: Regenerate outline to reflect new structure.
 
-## Naming Convention
-
-- File: `[type]-[short-title].md` (e.g., `blog-post-memory-palace.md`)
-- Lowercase, hyphens for spaces
+Always make minimal changes; preserve what works.
 
 ## For Poetry
 

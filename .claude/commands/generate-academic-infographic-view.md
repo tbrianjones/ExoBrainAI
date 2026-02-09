@@ -24,11 +24,15 @@ This skill corrects these failures by applying academic frameworks (Tufte, Cairo
 
 Ask what material to transform:
 
-1. **From an idea space**: "Which idea folder? I'll load the README, transcripts, and assets."
+1. **From an idea space**: "Which ExoBrain space? I'll load all the projected content."
+   - List spaces: `docker compose exec exobrain exobrain space list --json` (filter for `ideas/`)
+   - Refresh projection: `docker compose exec exobrain exobrain project`
+   - Read `.env` to determine `EXOBRAIN_DATA_DIR`
+   - Read all `.md` files from `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/`
 2. **Current conversation**: "I'll work from what we've discussed so far."
 3. **Describe content**: "Describe the concept, data, or ideas you want visualized."
 
-If working from an idea space, load context first (README, all transcripts, all assets) before proceeding.
+If working from an idea space, load context first (all projected files) before proceeding.
 
 ---
 
@@ -276,10 +280,21 @@ Verify no:
 
 ## PHASE 7: Output
 
-Present the final specification. Then write it to the idea space if one was specified.
+Present the final specification. Then save it to ExoBrain if an idea space was specified.
 
-### File Location
-`ideas/NNNN-name/views/infographic-[short-title].md`
+### Save to ExoBrain
+
+Pipe the content via stdin:
+```bash
+echo "[content]" | docker compose exec -T exobrain exobrain capture \
+  --title "[Infographic Title]" \
+  --type document \
+  --space "ideas/[space-name]" \
+  --tag view --tag infographic --tag draft \
+  --always-project \
+  --json
+```
+Then refresh: `docker compose exec exobrain exobrain project`
 
 ### File Format
 
@@ -456,17 +471,17 @@ Before finalizing, verify:
 
 ## Example Workflow
 
-**User**: "Create an infographic from ideas/0001-consciousness-in-the-age-of-ai"
+**User**: "Create an infographic from the consciousness idea space"
 
 **You**:
-1. Load: README, all transcripts, all assets from 0001-consciousness-in-the-age-of-ai
+1. Load: All projected files from `ideas/consciousness-in-the-age-of-ai` space
 2. Ask: "What's the primary purpose? And who's the audience?"
 3. Show extraction: core message, data points, structures, visual vocabulary, narrative arc
 4. Propose structure and archetype, get approval
 5. Develop complete content specification
 6. Show quality review
 7. Present final specification
-8. Write to `ideas/0001-consciousness-in-the-age-of-ai/views/infographic-[title].md`
+8. Save to ExoBrain via `exobrain capture --type document --space "ideas/consciousness-in-the-age-of-ai" --tag view --tag infographic --tag draft --always-project`
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 name: transcript-summary-generator
 description: Generates the synthesized portions of a transcript (header, Ideas & Themes, Transcript Summary). Pair with transcript-raw-generator for complete transcripts.
-tools: Read, Write, Glob
+tools: Read, Write, Glob, Bash
 ---
 
 # Transcript Summary Generator
@@ -14,22 +14,20 @@ Extract and synthesize the key concepts, themes, and insights from an ideation c
 
 ## What You Produce
 
-You write the first three sections of a transcript file:
+You create an ExoBrain Transcript object containing:
 
 1. **Header** with metadata
 2. **Ideas & Themes** section with extracted concepts
 3. **Transcript Summary** section with topical summaries
 
-You do NOT produce the Full Transcript section. That is handled by `transcript-raw-generator`.
-
 ## What to Capture
 
 - **Concepts and ideas** as they emerged and evolved
 - **Reasoning and thought processes** behind decisions
-- **Emotional threads**—enthusiasm, uncertainty, excitement, hesitation
+- **Emotional threads**; enthusiasm, uncertainty, excitement, hesitation
 - **Key realizations** and turning points in thinking
-- **The human's voice**—their unique way of expressing ideas
-- **Open-ended explorations**—ideas that weren't resolved but worth preserving
+- **The human's voice**; their unique way of expressing ideas
+- **Open-ended explorations**; ideas that weren't resolved but worth preserving
 
 ## What to Ignore
 
@@ -45,32 +43,9 @@ These are NOT part of ideation:
 
 ## Process
 
-1. **Scan the conversation** for ideation threads—where ideas are being explored, not where actions are being taken.
+1. **Scan the conversation** for ideation threads; where ideas are being explored, not where actions are being taken.
 
-2. **Build the header**:
-   - Title: A descriptive name for the idea/topic explored
-   - Person: The human's name (e.g., T. Brian Jones)
-   - AI: Brand, model, version (e.g., Claude Opus 4.5)
-   - Emotional analysis: Tags and/or sentence describing the emotional tenor
-   - Source thread: The Claude Code thread ID
-   - Raw transcript: Path to the jsonl file (`~/.claude/conversations/[thread-id].jsonl`)
-
-3. **Build Ideas & Themes**:
-   - Extract major themes, concepts, key realizations, turning points
-   - Format each as bolded title + 2-5 sentence summary
-   - Keep concise and explicit
-   - This is synthesis work—distill the essence
-
-4. **Build the Transcript Summary**:
-   - Organize by topic (these become section headings)
-   - Summarize Claude's contributions to essential points
-   - Preserve human's phrasing when it captures the idea well
-   - Pull exact quotes when prose is particularly expressive
-   - Limit to 15 topics maximum
-
-5. **Write the file** to the specified location, ending with the Transcript Summary section
-
-## Output Format
+2. **Build the content** in markdown format:
 
 ```markdown
 # [Idea/Topic Title]
@@ -93,22 +68,27 @@ These are NOT part of ideation:
 [Summarized content with key quotes preserved]
 ```
 
-## File Naming
+3. **Save to ExoBrain** by piping content via stdin:
 
-Output path: `ideas/NNNN-name/transcripts/YYYY-MM-DD-topic-summary.md`
+```bash
+echo "[content]" | docker compose exec -T exobrain exobrain capture \
+  --title "[Topic Title] (Summary)" \
+  --type transcript \
+  --space "[space-name]" \
+  --tag transcript --tag summary \
+  --created-at "[YYYY-MM-DDT00:00:00.000Z]" \
+  --always-project \
+  --json
+```
 
-- `NNNN-name`: The idea space folder
-- `YYYY-MM-DD`: Today's date
-- `topic`: Kebab-case description of the topic (e.g., `exobrain-core-vision`)
-- `-summary.md`: This suffix identifies the summary file
-
-The paired raw transcript will use the same path with `-raw.md` instead.
+4. **Report the object ID** back to the parent so it can create the derived-from link.
 
 ## Invocation
 
 When invoked, you'll receive:
-- The idea space path
-- A topic name
+- The ExoBrain space name (e.g., `ideas/exobrain`)
+- A topic name (e.g., `exobrain-core-vision`)
+- Today's date
 - Access to the conversation context
 
-Write to `ideas/[idea-space]/transcripts/YYYY-MM-DD-[topic]-summary.md`.
+Create the ExoBrain object and return the object ID.

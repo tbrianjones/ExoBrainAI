@@ -273,7 +273,17 @@ This skill corrects these failures by [approach from research].
 
 ## PHASE 1: Source Material
 
-[Standard source material phase]
+Ask what material to transform:
+
+1. **From an idea space**: "Which ExoBrain space? I'll load all the projected content."
+   - List spaces: `docker compose exec exobrain exobrain space list --json` (filter for `ideas/`)
+   - Refresh projection: `docker compose exec exobrain exobrain project`
+   - Read `.env` to determine `EXOBRAIN_DATA_DIR`
+   - Read all `.md` files from `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/`
+2. **Current conversation**: "I'll work from what we've discussed so far."
+3. **Describe content**: "Describe or paste the material you want transformed."
+
+If working from an idea space, load context first (all projected files) before proceeding.
 
 ---
 
@@ -289,7 +299,21 @@ This skill corrects these failures by [approach from research].
 
 ## PHASE N: Output
 
-[Standard output phase with file format]
+Present the final content. Then save it to ExoBrain if an idea space was specified.
+
+### Save to ExoBrain
+
+Pipe the content via stdin:
+```bash
+echo "[content]" | docker compose exec -T exobrain exobrain capture \
+  --title "[Title]" \
+  --type document \
+  --space "ideas/[space-name]" \
+  --tag view --tag [type] --tag draft \
+  --always-project \
+  --json
+```
+Then refresh: `docker compose exec exobrain exobrain project`
 
 ### File Format
 
