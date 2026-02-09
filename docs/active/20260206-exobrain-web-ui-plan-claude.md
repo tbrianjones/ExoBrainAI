@@ -6,7 +6,7 @@ related-adrs:
   - 002-sqlite-core-memory-layer
   - 003-exobrain-cli-architecture
   - 004-claude-code-first-ui
-  - 005-api-layer-deferred
+  - 005-api-layer
   - 006-information-centric-computing-vision
   - 007-projection-layer-architecture
 future-adr: 010-web-ui-architecture
@@ -434,7 +434,7 @@ docker compose exec exobrain pytest tests/test_ui_api.py -v
 - [ADR-002: SQLite Core Memory Layer](../adr/002-sqlite-core-memory-layer.md)
 - [ADR-003: ExoBrain CLI Architecture](../adr/003-exobrain-cli-architecture.md)
 - [ADR-004: Claude Code as First UI](../adr/004-claude-code-first-ui.md)
-- [ADR-005: API Layer Deferred](../adr/005-api-layer-deferred.md)
+- [ADR-005: API Layer Deferred](../adr/005-api-layer.md)
 - [ADR-006: Information-Centric Computing Vision](../adr/006-information-centric-computing-vision.md)
 - [ADR-007: Projection Layer Architecture](../adr/007-projection-layer-architecture.md)
 - **Future ADR:** ADR-010 should document the web UI architecture decision (HTMX + Jinja2, CLI subprocess for writes, repository for reads)

@@ -53,7 +53,7 @@ This is explicitly a "first UI" decision, not a "only UI" decision. A web UI or 
 1. User initiates a workflow in Claude Code (e.g., "capture this thought" or "what themes emerge?")
 2. The exobrain skill translates the request into CLI commands with `--json` output
 3. Claude parses the JSON response and presents results conversationally
-4. For capture workflows, Claude generates proposed metadata (title, summary, tags) and confirms with the user before writing overlays
+4. For capture workflows, Claude generates proposed metadata (title, summary, tags) and confirms with the user before creating objects
 5. For exploratory workflows, Claude can browse `$EXOBRAIN_DATA_DIR/projected/` directly, grepping for content and reading markdown files without CLI calls (see ADR-007)
 
 ## Consequences
@@ -88,7 +88,7 @@ This is explicitly a "first UI" decision, not a "only UI" decision. A web UI or 
 
 4. **MUST** document `--json` output schemas in the exobrain skill file (`.claude/skills/exobrain.md`) whenever new CLI commands are added or output formats change.
 
-5. **MUST NOT** bypass the CLI to read or write files in `$EXOBRAIN_DATA_DIR` directly. The CLI enforces validation, ID generation, and overlay semantics.
+5. **MUST NOT** bypass the CLI to write to `$EXOBRAIN_DATA_DIR` directly. The CLI enforces validation, ID generation, and data integrity. Reading projected files is the standard pattern for exploratory workflows (see ADR-007).
 
 6. **SHOULD** surface query results conversationally, summarizing themes and connections rather than dumping raw output.
 

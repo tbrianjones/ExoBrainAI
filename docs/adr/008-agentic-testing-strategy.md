@@ -25,7 +25,7 @@ Traditional unit tests verify code correctness but don't exercise the system the
 Adopt a three-tier testing strategy:
 
 ### Tier 1: Unit Tests (pytest, in-container)
-- **241+ tests** in `engine/tests/`
+- **293+ tests** in `engine/tests/`
 - Cover: repository CRUD, schema validation, migration execution, bootstrap idempotency, projection cycle, FTS5 integrity
 - Run via: `docker compose exec exobrain python -m pytest tests/ -v`
 - Use in-memory SQLite with fresh schema per test (via `conftest.py` fixtures)

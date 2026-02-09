@@ -167,7 +167,7 @@ The architectural implications:
 - ADR 002: `docs/adr/002-sqlite-core-memory-layer.md` (SQLite as source of truth)
 - ADR 003: `docs/adr/003-exobrain-cli-architecture.md` (CLI as mutation gateway)
 - ADR 004: `docs/adr/004-claude-code-first-ui.md` (AI agent as primary consumer)
-- ADR 005: `docs/adr/005-api-layer-deferred.md` (Interface adapters added as needed)
+- ADR 005: `docs/adr/005-api-layer.md` (Interface adapters added as needed)
 - Semantic Web: https://www.w3.org/standards/semanticweb/
 - Personal Knowledge Graphs: https://personalknowledgegraphs.com/
 - UUIDv7 RFC: https://www.rfc-editor.org/rfc/rfc9562.html

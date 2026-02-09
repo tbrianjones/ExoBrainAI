@@ -144,7 +144,7 @@ echo "My thought" | docker compose exec -T exobrain exobrain capture
 
 **Structured error types.** CLI commands currently raise `typer.Exit(1)` with ad-hoc error messages. A future improvement could define an `ExoError` hierarchy so that the exobrain skill can programmatically distinguish "not found" from "ambiguous prefix" from "FK constraint violation."
 
-**Projection and sync commands.** The `project`, `sync`, and `tier status` commands were added as part of the projection layer (ADR-007). The `sync` command exposes bidirectional sync from projected files back to SQLite, either for a single file or all projected files at once. See ADR-007 for details.
+**Projection and sync commands.** ✅ Completed per ADR-007. The `project`, `sync`, and `tier status` commands are documented in the Command Groups table above.
 
 **Link vocabulary.** Link relationships are unconstrained free text. Any string can be a relationship label. This provides flexibility but makes it harder to query or aggregate by relationship type. A future decision: should relationships be constrained to a vocabulary (like types are), or should the free-text approach continue? Document the choice when it matters.
 

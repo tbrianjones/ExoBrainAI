@@ -48,7 +48,7 @@ docker compose exec exobrain exobrain status
 | Command | When to Use |
 |---------|-------------|
 | `/ideate` | User wants to explore an idea (new or existing) |
-| `/instantiate-idea` | Create folder structure; usually called by /ideate |
+| `/instantiate-idea` | Create a new idea space in ExoBrain; usually called by /ideate |
 | `/generate-transcript` | User wants to capture current conversation |
 | `/generate-view` | User wants production content from an idea |
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
@@ -88,18 +88,13 @@ docker compose exec exobrain exobrain status
 │   ├── commands/           # User-invoked commands
 │   ├── agents/             # Autonomous subagents
 │   └── skills/             # exobrain, title-generation, etc.
-├── ideas/NNNN-name/        # Legacy idea spaces (migrating to ExoBrain)
-│   ├── README.md
-│   ├── assets/
-│   ├── transcripts/
-│   └── views/
 ├── templates/
 │   ├── voices/             # Writing voice/style references
 │   ├── poetry/             # Poetry generation frameworks
 │   ├── infographics/       # Infographic generation frameworks
 │   └── ...
 ├── docs/
-│   └── adr/                # Architecture Decision Records (001-009)
+│   └── adr/                # Architecture Decision Records (001-010)
 ├── site/                   # Quarto site for publishing
 ├── docker-compose.yml
 └── .env.example
@@ -122,7 +117,7 @@ Run via: `docker compose exec exobrain exobrain <command>`
 
 | Command | Description |
 |---------|-------------|
-| `capture [CONTENT]` | Create object; `--title`, `--type`, `--space`, `--tag`, `--file` |
+| `capture [CONTENT]` | Create object; `--title`, `--type`, `--space`, `--tag`, `--file`, `--created-at`, `--always-project` |
 | `get ID` | Full object detail with tags, links, file info |
 | `list` | Filter: `--type`, `--space`, `--tag`, `--limit`, `--offset` |
 | `update ID` | `--title`, `--summary`, `--content`, `--space`, `--always-project`, `--never-project`, `--auto-project` |
@@ -167,16 +162,27 @@ Projected files have YAML frontmatter and support bidirectional sync. Edit proje
 | `graphrag index` | Run GraphRAG indexing |
 | `graphrag query "text"` | Query the GraphRAG index |
 
-## Working in Idea Spaces
+## Working with Idea Spaces
 
-Before generating content in `ideas/NNNN-name/`:
+Idea spaces live in ExoBrain under the `ideas/` space hierarchy. Commands use a hybrid pattern: projected files for reads, CLI for writes.
 
-1. Read `README.md`
-2. Read all files in `transcripts/`
-3. Read all files in `assets/`
-4. Scan `views/` for existing voice/style patterns
+**Loading context** (reading from an idea space):
+1. Refresh projection: `docker compose exec exobrain exobrain project`
+2. Read `.env` to find `EXOBRAIN_DATA_DIR`
+3. Read projected files from `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/*.md`
+4. Each file has YAML frontmatter (id, type, space, title, summary, tags, dates) + content body
 
-Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` do this automatically.
+**Creating content** (writing to an idea space):
+```bash
+echo "[content]" | docker compose exec -T exobrain exobrain capture \
+  --title "Title" --type document --space "ideas/space-name" \
+  --tag view --tag draft --always-project --json
+docker compose exec exobrain exobrain project
+```
+
+**Discovering spaces**: `docker compose exec exobrain exobrain space list --json` (filter for `ideas/`)
+
+Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` handle this automatically.
 
 ## Style Rules
 
@@ -200,7 +206,7 @@ ADRs document key architectural choices. Read these before making significant ch
 | [002](docs/adr/002-sqlite-core-memory-layer.md) | SQLite as core memory layer; repository pattern; FTS5 |
 | [003](docs/adr/003-exobrain-cli-architecture.md) | CLI as sole write interface |
 | [004](docs/adr/004-claude-code-first-ui.md) | Claude Code as first UI |
-| [005](docs/adr/005-api-layer-deferred.md) | API layer deferred until consumer exists |
+| [005](docs/adr/005-api-layer.md) | API layer (partially superseded by ADR-010) |
 | [006](docs/adr/006-information-centric-computing-vision.md) | Information-centric computing vision |
 | [007](docs/adr/007-projection-layer-architecture.md) | Projection layer with hot tier scoring and bidirectional sync |
 | [008](docs/adr/008-agentic-testing-strategy.md) | Three-tier testing: unit tests + agentic integration + fixtures |

@@ -40,6 +40,14 @@ echo "My idea about distributed systems" | docker compose exec -T exobrain exobr
 docker compose exec exobrain exobrain capture "Meeting notes from Q1 planning" \
   --title "Q1 Planning" --tag meeting --tag planning
 
+# Capture with a specific creation date
+docker compose exec exobrain exobrain capture "Backdated note" \
+  --title "Journal Entry" --created-at "2026-01-15T10:00:00Z"
+
+# Capture and force projection
+docker compose exec exobrain exobrain capture "Important idea" \
+  --title "Key Insight" --always-project
+
 # Capture with a file attachment
 docker compose exec exobrain exobrain capture "Design document" \
   --title "Architecture v2" --file /path/to/diagram.png
@@ -221,6 +229,7 @@ Base: `http://localhost:8420`
 | `/admin/stage` | POST | Trigger staging |
 | `/admin/index/incremental` | POST | Incremental index |
 | `/admin/index/rebuild` | POST | Full rebuild |
+| `/ui/` | GET | Read-only web UI explorer (see ADR-010) |
 
 ## Configuration
 
@@ -240,10 +249,12 @@ Open this project in Claude Code to use:
 | Command | Description |
 |---------|-------------|
 | `/ideate` | Explore an idea through guided conversation |
+| `/instantiate-idea` | Create a new idea space in ExoBrain |
 | `/generate-transcript` | Save current conversation as transcript |
 | `/generate-view` | Create production content from an idea |
 | `/generate-poem-view` | Generate poetry using Poetic Inquiry |
 | `/generate-academic-infographic-view` | Create academically rigorous infographic specs |
+| `/generate-new-view-command` | Create a new specialized view generator command |
 | `/publish-quarto` | Publish view to ideas.tbrianjones.com |
 | `/test-system` | Run end-to-end integration test simulating a real user session |
 
@@ -252,6 +263,7 @@ Open this project in Claude Code to use:
 | Service | Port | Purpose |
 |---------|------|---------|
 | ExoBrain API | 8420 | REST API + CLI |
+| Web UI | 8420 | Read-only explorer at `/ui/` |
 | Dozzle | 9998 | Container log viewer |
 | Gephi Lite | 8081 | Graph visualization (optional; graphrag profile) |
 | Ollama | 11434 | LLM inference (native, not in Docker by default) |

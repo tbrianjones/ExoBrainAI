@@ -1,8 +1,8 @@
-# ADR 005: API Layer Deferred
+# ADR 005: API Layer
 
-- **Status:** Accepted
+- **Status:** Accepted (partially superseded by [ADR-010](010-web-ui-architecture.md) for read-only web UI)
 - **Date:** 2026-01-27
-- **Tags:** architecture, api, deferred
+- **Tags:** architecture, api
 - **Impact:** Low
 
 ## Context
@@ -67,11 +67,11 @@ The CLI is the sole supported interface for v0. Claude Code invokes the CLI thro
 
 1. **MUST NOT** rely on API routes for any v0 functionality. All operations go through the CLI.
 
-2. **SHOULD** preserve existing API code in `engine/src/api/` but do not extend, refactor, or add tests for it.
+2. **SHOULD** preserve existing API code in `engine/src/api/` but do not extend, refactor, or add tests for it. *(Note: ADR-010 added read-only web UI routes at `/ui/`; this rule applies to write API routes.)*
 
 3. **MUST** document this deferral clearly so future agents do not accidentally build features on top of the API layer. The API is not a supported interface for v0.
 
-4. **MUST NOT** add new API routes or update existing ones unless a concrete consumer has been identified and an ADR is written to activate the API.
+4. **MUST NOT** add new write API routes or update existing ones unless a concrete consumer has been identified and an ADR is written to activate the write API. *(Note: ADR-010 authorized read-only web UI routes at `/ui/`.)*
 
 5. **SHOULD** ensure CLI commands have complete feature parity with any future API; the CLI is the primary interface and must not become a second-class citizen.
 
