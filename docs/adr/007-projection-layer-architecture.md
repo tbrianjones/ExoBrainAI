@@ -238,4 +238,6 @@ ALTER TABLE objects ADD COLUMN projection_override TEXT;
 - ADR-003: `docs/adr/003-exobrain-cli-architecture.md` (CLI as mutation gateway)
 - ADR-004: `docs/adr/004-claude-code-first-ui.md` (AI agent as primary consumer)
 - ADR-006: `docs/adr/006-information-centric-computing-vision.md` (Universal access vision)
+- ADR-011: `docs/adr/011-primitive-semantics-and-knowledge-gardening.md` (Space mutability; relaxes rule #3 for `space` field)
 - Implementation Plan: `docs/active/20260128-exobrain-projection-layer-plan-claude.md`
+- External: [Letta Filesystem Benchmark (July 2025)](https://www.letta.com/blog/benchmarking-ai-agent-memory); storing conversational histories as files with well-designed agents achieved 74.0% on LoCoMo, outperforming specialized memory retrieval libraries. Validates the projection-to-filesystem design pattern.

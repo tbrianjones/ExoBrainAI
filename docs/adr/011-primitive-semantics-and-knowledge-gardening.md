@@ -201,3 +201,6 @@ The primitive semantics defined in this ADR accommodate this future by establish
 - ADR-003: `docs/adr/003-exobrain-cli-architecture.md` (CLI as sole write interface)
 - ADR-006: `docs/adr/006-information-centric-computing-vision.md` (information-centric vision; "humans capture, agents organize")
 - ADR-007: `docs/adr/007-projection-layer-architecture.md` (projection layer; rule #3 space immutability to be relaxed per this ADR)
+- External: [A-MEM: Agentic Memory for LLM Agents (NeurIPS 2025)](https://arxiv.org/abs/2502.12110); Zettelkasten-inspired memory evolution where existing memories update as new information arrives. Validates the knowledge gardening vision.
+- External: [Letta Filesystem Benchmark (July 2025)](https://www.letta.com/blog/benchmarking-ai-agent-memory); filesystem-based memory with well-designed agents outperforms specialized retrieval. Validates ExoBrain's SQLite + projected markdown architecture.
+- External: [Zettelkasten + PARA Combined](https://zettelkasten.de/posts/building-a-second-brain-and-zettelkasten/); consensus that ideation (Zettelkasten spoke) and project management (PARA hub) should be structurally separate but linked. Validates the `ideas/` vs future `projects/` separation.
