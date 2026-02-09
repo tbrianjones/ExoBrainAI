@@ -1,9 +1,10 @@
 """Full-page UI route handlers (all GET, read-only)."""
 
 import html
+import re
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
 from src import __version__
 from src.core.db import db_session, get_db_path
@@ -235,6 +236,101 @@ async def object_download_markdown(request: Request, obj_id: str):
         return PlainTextResponse(
             content=md_content,
             media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+
+@router.get("/objects/{obj_id}/pdf")
+async def object_download_pdf(request: Request, obj_id: str):
+    """Download an object as a PDF rendered from its markdown content."""
+    from weasyprint import HTML
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return PlainTextResponse("Database not found", status_code=503)
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        tag_repo = TagRepo(conn)
+
+        obj = obj_repo.get(obj_id)
+        if obj is None:
+            obj = obj_repo.get_by_prefix(obj_id)
+        if obj is None:
+            return PlainTextResponse("Object not found", status_code=404)
+
+        tags = tag_repo.list_for_object(obj["id"])
+
+        # Build the content HTML from markdown
+        content_html = ""
+        if obj.get("summary"):
+            content_html += _render_markdown(f"**Summary:** {obj['summary']}")
+        if obj.get("content"):
+            content_html += _render_markdown(obj["content"])
+
+        # Build tag badges
+        tag_html = ""
+        if tags:
+            tag_html = " ".join(
+                f'<span class="tag">{html.escape(t)}</span>' for t in tags
+            )
+
+        # Standalone HTML document with inline styles
+        pdf_html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+  body {{ font-family: sans-serif; color: #1a1a1a; line-height: 1.6; margin: 0; padding: 0; }}
+  .meta {{ background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 6px;
+           padding: 16px 20px; margin-bottom: 24px; font-size: 11px; color: #64748b; }}
+  .meta h1 {{ font-size: 20px; color: #111827; margin: 0 0 8px 0; }}
+  .meta .type {{ display: inline-block; background: #dbeafe; color: #1d4ed8;
+                 padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }}
+  .meta .space {{ color: #6b7280; margin-left: 8px; }}
+  .meta-grid {{ display: flex; gap: 24px; margin-top: 8px; font-family: monospace; font-size: 10px; }}
+  .tag {{ display: inline-block; background: #f1f5f9; color: #475569;
+          padding: 2px 8px; border-radius: 10px; font-size: 10px; margin-right: 4px; }}
+  .tags {{ margin-top: 8px; }}
+  .content {{ font-size: 14px; }}
+  .content h1 {{ font-size: 22px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }}
+  .content h2 {{ font-size: 18px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }}
+  .content h3 {{ font-size: 16px; }}
+  .content pre {{ background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px;
+                  padding: 12px; overflow-x: auto; font-size: 12px; }}
+  .content code {{ background: #f1f5f9; padding: 1px 4px; border-radius: 3px; font-size: 0.9em; }}
+  .content pre code {{ background: none; padding: 0; }}
+  .content blockquote {{ border-left: 3px solid #d1d5db; margin-left: 0; padding-left: 16px; color: #6b7280; }}
+  .content table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
+  .content th, .content td {{ border: 1px solid #d1d5db; padding: 6px 10px; text-align: left; font-size: 13px; }}
+  .content th {{ background: #f8f9fa; font-weight: 600; }}
+  .content a {{ color: #2563eb; }}
+  .content img {{ max-width: 100%; }}
+</style></head><body>
+<div class="meta">
+  <h1>{html.escape(obj.get('title', ''))}</h1>
+  <span class="type">{html.escape(obj.get('type_name', ''))}</span>
+  <span class="space">{html.escape(obj.get('space_name', ''))}</span>
+  <div class="meta-grid">
+    <span>ID: {obj['id']}</span>
+    <span>Created: {obj.get('created_at', '')}</span>
+    <span>Updated: {obj.get('updated_at', '')}</span>
+  </div>
+  {"<div class='tags'>" + tag_html + "</div>" if tag_html else ""}
+</div>
+<div class="content">
+  {content_html}
+</div>
+</body></html>"""
+
+        pdf_bytes = HTML(string=pdf_html).write_pdf()
+
+        # Slugify title for filename
+        slug = re.sub(r"[^\w\s-]", "", obj.get("title", "object").lower())
+        slug = re.sub(r"[\s]+", "-", slug).strip("-") or "object"
+        filename = f"{slug}.pdf"
+
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
