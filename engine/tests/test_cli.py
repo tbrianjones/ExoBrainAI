@@ -569,3 +569,152 @@ class TestURLTypeResolution:
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["type_name"] == "URL"
+
+
+# ============================================================
+# Capture: --always-project and --created-at flags
+# ============================================================
+
+
+class TestCaptureFlags:
+    """Test capture flags used by rewired commands."""
+
+    def test_capture_always_project(self, initialized_db):
+        """capture --always-project sets projection_override to 'always'."""
+        result = runner.invoke(app, [
+            "capture", "always project test",
+            "--title", "Always Projected",
+            "--always-project", "--json",
+        ])
+        assert result.exit_code == 0
+        obj = json.loads(result.output)
+        assert obj["projection_override"] == "always"
+
+    def test_capture_created_at(self, initialized_db):
+        """capture --created-at preserves the given timestamp."""
+        ts = "2025-06-15T10:30:00.000Z"
+        result = runner.invoke(app, [
+            "capture", "timestamp test",
+            "--title", "Timestamped",
+            "--created-at", ts, "--json",
+        ])
+        assert result.exit_code == 0
+        obj = json.loads(result.output)
+        assert obj["created_at"] == ts
+        assert obj["updated_at"] == ts
+
+    def test_capture_stdin(self, initialized_db):
+        """capture reads from stdin when no content argument is given."""
+        result = runner.invoke(app, [
+            "capture", "--title", "From Stdin", "--json",
+        ], input="stdin content here")
+        assert result.exit_code == 0
+        obj = json.loads(result.output)
+        assert "stdin content here" in obj.get("content", "")
+
+    def test_capture_full_combo(self, initialized_db):
+        """capture with all flags used by generate-transcript and similar commands."""
+        result = runner.invoke(app, [
+            "capture",
+            "--title", "Transcript",
+            "--type", "document",
+            "--space", "inbox",
+            "--tag", "transcript",
+            "--tag", "raw",
+            "--always-project",
+            "--created-at", "2025-01-01T00:00:00.000Z",
+            "--json",
+        ], input="Full transcript content")
+        assert result.exit_code == 0
+        obj = json.loads(result.output)
+        assert obj["title"] == "Transcript"
+        assert obj["projection_override"] == "always"
+        assert obj["created_at"] == "2025-01-01T00:00:00.000Z"
+        assert "Full transcript content" in obj.get("content", "")
+
+
+# ============================================================
+# Projection CLI commands
+# ============================================================
+
+
+class TestProjectionCLI:
+    """Test project, sync, and tier status CLI commands."""
+
+    @pytest.fixture(autouse=True)
+    def _ensure_projected_dir(self, initialized_db):
+        """Ensure projected_dir exists for projection tests."""
+        from src.config import settings
+        settings.projected_dir.mkdir(parents=True, exist_ok=True)
+
+    def test_project_cli(self, initialized_db):
+        """project runs without error on a bootstrapped DB."""
+        result = runner.invoke(app, ["project", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "projected" in data
+        assert "spaces" in data
+        assert "errors" in data
+
+    def test_project_dry_run(self, initialized_db):
+        """project --dry-run returns a preview without writing files."""
+        result = runner.invoke(app, ["project", "--dry-run", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["dry_run"] is True
+
+    def test_project_cleanup(self, initialized_db):
+        """project --cleanup removes stale projections."""
+        result = runner.invoke(app, ["project", "--cleanup", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "deprojected" in data
+
+    def test_tier_status_cli(self, initialized_db):
+        """tier status returns expected fields."""
+        result = runner.invoke(app, ["tier", "status", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "total_objects" in data
+        assert "projected_count" in data
+        assert "hot_tier_limit" in data
+        assert "currently_projected_files" in data
+
+    def test_sync_cli(self, initialized_db):
+        """sync runs without error (even when no projected files exist)."""
+        from src.config import settings
+        settings.projected_dir.mkdir(parents=True, exist_ok=True)
+        result = runner.invoke(app, ["sync", "--json"])
+        assert result.exit_code == 0
+
+    def test_capture_project_integration(self, initialized_db):
+        """Integration: capture --always-project then project creates a file on disk."""
+        from src.config import settings
+
+        # Create object with always-project
+        result = runner.invoke(app, [
+            "capture", "integration test content",
+            "--title", "Integration Test",
+            "--always-project", "--json",
+        ])
+        assert result.exit_code == 0
+        obj = json.loads(result.output)
+
+        # Run projection
+        proj_result = runner.invoke(app, ["project", "--json"])
+        assert proj_result.exit_code == 0
+
+        # Verify projected file exists
+        projected_files = list(settings.projected_dir.rglob("*.md"))
+        # Filter out CLAUDE.md
+        content_files = [f for f in projected_files if f.name != "CLAUDE.md"]
+        assert len(content_files) >= 1
+
+        # Verify our object's file exists (match by ID prefix)
+        obj_id_prefix = obj["id"][:12]
+        matching = [f for f in content_files if obj_id_prefix in f.name]
+        assert len(matching) == 1
+
+        # Verify file content includes our text
+        file_content = matching[0].read_text()
+        assert "integration test content" in file_content
