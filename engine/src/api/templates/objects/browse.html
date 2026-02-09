@@ -13,7 +13,7 @@
                    hx-get="/ui-api/objects"
                    hx-trigger="keyup changed delay:300ms"
                    hx-target="#object-list"
-                   hx-include="[name='type'],[name='space'],[name='tag']">
+                   hx-include="[name='type'],[name='space'],[name='tag'],[name='system']">
         </div>
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
@@ -22,7 +22,7 @@
                     hx-get="/ui-api/objects"
                     hx-trigger="change"
                     hx-target="#object-list"
-                    hx-include="[name='q'],[name='space'],[name='tag']">
+                    hx-include="[name='q'],[name='space'],[name='tag'],[name='system']">
                 <option value="">All types</option>
                 {% for t in types %}
                 <option value="{{ t.title }}">{{ t.title }}</option>
@@ -36,7 +36,7 @@
                     hx-get="/ui-api/objects"
                     hx-trigger="change"
                     hx-target="#object-list"
-                    hx-include="[name='q'],[name='type'],[name='tag']">
+                    hx-include="[name='q'],[name='type'],[name='tag'],[name='system']">
                 <option value="">All spaces</option>
                 {% for s in spaces %}
                 <option value="{{ s.title }}">{{ s.title }}</option>
@@ -50,12 +50,23 @@
                     hx-get="/ui-api/objects"
                     hx-trigger="change"
                     hx-target="#object-list"
-                    hx-include="[name='q'],[name='type'],[name='space']">
+                    hx-include="[name='q'],[name='type'],[name='space'],[name='system']">
                 <option value="">All tags</option>
                 {% for t in tags %}
                 <option value="{{ t.tag_text }}">{{ t.tag_text }} ({{ t.count }})</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="flex items-center pt-4">
+            <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" name="system" value="1"
+                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                       hx-get="/ui-api/objects"
+                       hx-trigger="change"
+                       hx-target="#object-list"
+                       hx-include="[name='q'],[name='type'],[name='space'],[name='tag']">
+                System objects
+            </label>
         </div>
     </div>
 </div>

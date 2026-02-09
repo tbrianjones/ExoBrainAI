@@ -288,7 +288,7 @@ Pipe the content via stdin:
 ```bash
 echo "[content]" | docker compose exec -T exobrain exobrain capture \
   --title "[Infographic Title]" \
-  --type document \
+  --type view \
   --space "ideas/[space-name]" \
   --tag view --tag infographic --tag draft \
   --always-project \
@@ -481,7 +481,7 @@ Before finalizing, verify:
 5. Develop complete content specification
 6. Show quality review
 7. Present final specification
-8. Save to ExoBrain via `exobrain capture --type document --space "ideas/consciousness-in-the-age-of-ai" --tag view --tag infographic --tag draft --always-project`
+8. Save to ExoBrain via `exobrain capture --type view --space "ideas/consciousness-in-the-age-of-ai" --tag view --tag infographic --tag draft --always-project`
 
 ---
 

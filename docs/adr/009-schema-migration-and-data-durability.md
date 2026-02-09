@@ -105,6 +105,7 @@ The primary backup mechanism is Dropbox sync of `$EXOBRAIN_DATA_DIR`. Additional
 | 003 | 3 | Access log table, `projection_override` column |
 | 004 | 4 | Performance indexes, `source`, `status`, `is_system_object` columns, link metadata |
 | 005 | 5 | Move space paths from `summary` to `title`; space `title` is now the hierarchical path |
+| 006 | 6 | Create View type and retype view-tagged Document objects to View |
 
 ## Agent Rules
 

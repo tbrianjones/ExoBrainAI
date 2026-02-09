@@ -71,7 +71,7 @@ When writing prose:
    ```bash
    echo "[content]" | docker compose exec -T exobrain exobrain capture \
      --title "[Title]" \
-     --type document \
+     --type view \
      --space "ideas/[space-name]" \
      --tag view --tag [content-type] --tag draft \
      --always-project \

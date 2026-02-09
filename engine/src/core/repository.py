@@ -124,6 +124,7 @@ class ObjectRepo:
         tag: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        include_system: bool = False,
     ) -> list[dict]:
         """List objects with optional filters."""
         query = """
@@ -139,9 +140,12 @@ class ObjectRepo:
         params = []
 
         if type_name:
+            # Type filter takes precedence: when explicitly filtering by type,
+            # system objects are always included (user is making a specific query).
+            # The include_system flag applies only to unfiltered listings.
             conditions.append("LOWER(t.title) = ?")
             params.append(type_name.lower())
-        else:
+        elif not include_system:
             # Exclude system objects (types, spaces, tags) from default listing
             conditions.append("o.is_system_object = 0")
 
@@ -237,7 +241,7 @@ class ObjectRepo:
 
         return cursor.rowcount > 0
 
-    def search(self, query: str, limit: int = 20) -> list[dict]:
+    def search(self, query: str, limit: int = 20, include_system: bool = False) -> list[dict]:
         """Full-text search across title, summary, and content.
 
         User input is quoted to prevent FTS5 syntax injection (AND, OR, NOT,
@@ -247,8 +251,10 @@ class ObjectRepo:
         # Quote the query to force literal matching; escape internal quotes
         safe_query = '"' + query.replace('"', '""') + '"'
 
+        system_filter = "" if include_system else "AND o.is_system_object = 0"
+
         rows = self.conn.execute(
-            """SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
+            f"""SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
                       o.created_at, o.updated_at,
                       t.title as type_name,
                       s.title as space_name,
@@ -258,7 +264,7 @@ class ObjectRepo:
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
                WHERE objects_fts MATCH ?
-               AND o.is_system_object = 0
+               {system_filter}
                ORDER BY rank
                LIMIT ?""",
             (safe_query, limit),

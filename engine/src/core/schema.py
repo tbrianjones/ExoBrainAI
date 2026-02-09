@@ -155,10 +155,22 @@ AND id NOT LIKE '00000000%'
 AND summary IS NOT NULL;
 """
 
+MIGRATION_006 = """
+-- Retype all view-tagged objects from Document to View.
+-- The View type object (00000000-0000-7000-8000-00000000000c) is created by
+-- bootstrap, which runs after migrations. This migration only retypes existing
+-- objects; the UPDATE is a no-op if no view-tagged Documents exist or if the
+-- View type hasn't been bootstrapped yet (init runs bootstrap immediately after).
+UPDATE objects SET type_id = '00000000-0000-7000-8000-00000000000c'
+WHERE id IN (SELECT object_id FROM object_tags WHERE tag_text = 'view')
+AND type_id = '00000000-0000-7000-8000-000000000004';
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
     (3, "Access log and projection override", MIGRATION_003),
     (4, "Performance indexes, source, status, is_system_object, link metadata", MIGRATION_004),
     (5, "Move space paths from summary to title", MIGRATION_005),
+    (6, "Create View type and retype view-tagged documents", MIGRATION_006),
 ]

@@ -18,11 +18,11 @@ from src.core.db import check_integrity
 class TestBootstrapCreation:
     """Test that bootstrap creates the expected types and spaces."""
 
-    def test_creates_eleven_types(self, db_conn):
+    def test_creates_twelve_types(self, db_conn):
         result = bootstrap(db_conn)
-        # 7 original + 4 new (person, project, event, concept)
-        assert result["types_created"] == 11
-        assert len(BOOTSTRAP_TYPES) == 11
+        # 7 original + 4 (person, project, event, concept) + 1 (view)
+        assert result["types_created"] == 12
+        assert len(BOOTSTRAP_TYPES) == 12
 
     def test_creates_six_spaces(self, db_conn):
         result = bootstrap(db_conn)
@@ -59,7 +59,7 @@ class TestBootstrapIdempotency:
     def test_idempotent_second_run_creates_nothing(self, db_conn):
         first = bootstrap(db_conn)
         second = bootstrap(db_conn)
-        assert first["types_created"] == 11
+        assert first["types_created"] == 12
         assert second["types_created"] == 0
         assert first["spaces_created"] == 6
         assert second["spaces_created"] == 0
@@ -161,6 +161,13 @@ class TestNewBootstrapTypes:
         ).fetchone()
         assert row is not None
         assert row["title"] == "Concept"
+
+    def test_view_type_exists(self, bootstrapped_db):
+        row = bootstrapped_db.execute(
+            "SELECT * FROM objects WHERE id = ?", (BOOTSTRAP_IDS["view"],)
+        ).fetchone()
+        assert row is not None
+        assert row["title"] == "View"
 
     def test_relationship_space_exists(self, bootstrapped_db):
         row = bootstrapped_db.execute(

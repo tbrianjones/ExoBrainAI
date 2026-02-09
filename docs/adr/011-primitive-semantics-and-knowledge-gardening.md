@@ -169,8 +169,8 @@ The primitive semantics defined in this ADR accommodate this future by establish
 |------|--------|-------|
 | Remove space immutability in `sync_from_file` | Pending | `engine/src/core/projection.py` lines 559-567 |
 | Update ADR-007 rule #3 | Pending | Remove `space` from immutable fields list |
-| Generalize `idea-readme` tag to `space-readme` | Pending | Convention for all spaces, not just idea spaces |
-| Enrich bootstrap space descriptions | Pending | `engine/src/core/bootstrap.py` lines 52-59 |
+| Generalize `idea-readme` tag to `space-readme` | Superseded | Space descriptions now live on the space object directly (summary + content fields); separate readme concepts are no longer needed |
+| Enrich bootstrap space descriptions | Done | Space objects now have summary + content via bootstrap enrichment and one-time data script |
 | Knowledge gardening agent | Pending | Future capability; vision documented in this ADR |
 
 ## Agent Rules

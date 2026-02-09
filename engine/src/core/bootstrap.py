@@ -24,6 +24,7 @@ BOOTSTRAP_IDS = {
     "project": "00000000-0000-7000-8000-000000000009",
     "event": "00000000-0000-7000-8000-00000000000a",
     "concept": "00000000-0000-7000-8000-00000000000b",
+    "view": "00000000-0000-7000-8000-00000000000c",
     # Spaces
     "primitives": "00000000-0000-7000-8000-000000000101",
     "primitives/type": "00000000-0000-7000-8000-000000000102",
@@ -35,17 +36,18 @@ BOOTSTRAP_IDS = {
 
 # Initial type definitions
 BOOTSTRAP_TYPES = [
-    ("type", "Type", "Object type definition; controls behavior"),
-    ("space", "Space", "Hierarchical organizational unit"),
-    ("tag", "Tag", "Semantic label for classification"),
-    ("document", "Document", "General purpose document"),
-    ("transcript", "Transcript", "Conversation or interview transcript"),
-    ("note", "Note", "Short thought or observation"),
-    ("url", "URL", "Web resource reference"),
-    ("person", "Person", "Contact, author, or speaker reference"),
-    ("project", "Project", "Bounded initiative with defined scope"),
-    ("event", "Event", "Time-bounded occurrence like meeting or conference"),
-    ("concept", "Concept", "Abstract idea or term definition"),
+    ("type", "Type", "Object type definition; controls how the system processes and displays an object"),
+    ("space", "Space", "Hierarchical namespace; groups related objects for browsing, projection, and access control"),
+    ("tag", "Tag", "Semantic label for faceted classification; freely added and removed"),
+    ("document", "Document", "Long-form written content: essays, reports, procedures, reference material. Use View for rendered output from idea spaces"),
+    ("transcript", "Transcript", "Verbatim or summarized record of a conversation, interview, or ideation session"),
+    ("note", "Note", "Brief thought, observation, or fragment; the atomic unit of capture"),
+    ("url", "URL", "Web resource reference with optional annotation"),
+    ("person", "Person", "Individual referenced in the knowledge base; author, contact, collaborator, or subject"),
+    ("project", "Project", "Bounded initiative with defined scope, timeline, and deliverables"),
+    ("event", "Event", "Time-bounded occurrence: meeting, conference, milestone, or deadline"),
+    ("concept", "Concept", "Abstract idea, term definition, or framework; the conceptual backbone of an idea space"),
+    ("view", "View", "Rendered content produced from source material in an idea space; poems, blog posts, briefs, infographics, and other publication-ready output"),
 ]
 
 # Initial space definitions
@@ -121,6 +123,22 @@ def bootstrap(conn: sqlite3.Connection) -> dict:
             f"UPDATE objects SET is_system_object = 1, source = 'system' WHERE id IN ({placeholders})",
             all_bootstrap_ids,
         )
+
+        # 4. Update summaries for existing bootstrap types (enrichment)
+        for key, title, summary in BOOTSTRAP_TYPES:
+            obj_id = BOOTSTRAP_IDS[key]
+            conn.execute(
+                "UPDATE objects SET summary = ? WHERE id = ? AND summary != ?",
+                (summary, obj_id, summary),
+            )
+
+        # 5. Update summaries for existing bootstrap spaces (enrichment)
+        for key, title, summary in BOOTSTRAP_SPACES:
+            obj_id = BOOTSTRAP_IDS[key]
+            conn.execute(
+                "UPDATE objects SET summary = ? WHERE id = ? AND summary != ?",
+                (summary, obj_id, summary),
+            )
 
         conn.commit()
     except Exception:

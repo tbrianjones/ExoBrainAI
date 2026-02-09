@@ -94,6 +94,7 @@ async def list_objects(
     type: str = "",
     space: str = "",
     tag: str = "",
+    system: str = "",
     limit: int = 50,
     offset: int = 0,
 ):
@@ -103,6 +104,7 @@ async def list_objects(
     # Cap limit to prevent unbounded queries
     limit = min(max(1, limit), MAX_LIMIT)
     offset = max(0, offset)
+    include_system = system == "1"
 
     db_path = get_db_path()
     if not db_path.exists():
@@ -114,7 +116,7 @@ async def list_objects(
 
         if q.strip():
             # Fetch enough results to cover the offset + page
-            objects = obj_repo.search(q.strip(), limit=offset + limit)
+            objects = obj_repo.search(q.strip(), limit=offset + limit, include_system=include_system)
             objects = objects[offset:]
         else:
             objects = obj_repo.list(
@@ -123,6 +125,7 @@ async def list_objects(
                 tag=tag or None,
                 limit=limit,
                 offset=offset,
+                include_system=include_system,
             )
 
         # Batch fetch tags (avoids N+1 query)

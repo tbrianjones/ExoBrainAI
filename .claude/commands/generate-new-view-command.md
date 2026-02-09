@@ -307,7 +307,7 @@ Pipe the content via stdin:
 ```bash
 echo "[content]" | docker compose exec -T exobrain exobrain capture \
   --title "[Title]" \
-  --type document \
+  --type view \
   --space "ideas/[space-name]" \
   --tag view --tag [type] --tag draft \
   --always-project \

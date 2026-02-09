@@ -241,7 +241,7 @@ Pipe the content via stdin:
 ```bash
 echo "[content]" | docker compose exec -T exobrain exobrain capture \
   --title "[Poem Title]" \
-  --type document \
+  --type view \
   --space "ideas/[space-name]" \
   --tag view --tag poem --tag draft \
   --always-project \
@@ -338,7 +338,7 @@ Before finalizing, verify:
 5. Draft following all constraints
 6. Show revision notes
 7. Present final poem
-8. Save to ExoBrain via `exobrain capture --type document --space "ideas/consciousness-in-the-age-of-ai" --tag view --tag poem --tag draft --always-project`
+8. Save to ExoBrain via `exobrain capture --type view --space "ideas/consciousness-in-the-age-of-ai" --tag view --tag poem --tag draft --always-project`
 
 ---
 
