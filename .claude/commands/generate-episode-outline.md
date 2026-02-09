@@ -1,12 +1,12 @@
 ---
 name: generate-episode-outline
-description: Generate Zengineering podcast pre-production outlines from brainstorm transcripts or idea space content. Produces story beats with terse note-card prompts for improvised delivery.
+description: Generate Zengineering podcast pre-production outlines from brainstorm transcripts or idea space content. Produces three layers of depth from quick-scan to full narrative.
 allowed-tools: Read, Write, Glob, Bash
 ---
 
 # Zengineering Episode Outline Generator
 
-Generate pre-production outlines for the Zengineering podcast. These outlines are producer notes; structured story beats that let the hosts improv their way back to the key ideas from a brainstorm session.
+Generate pre-production outlines for the Zengineering podcast. The outline is structured in three layers of increasing depth so the producer can scan at whatever level of detail they need.
 
 ## CRITICAL: Load Context First
 
@@ -33,28 +33,52 @@ Zengineering is a podcast about the intersection of science, technology, enginee
 - **Build forward**: Connect first principles to the modern technological or sociological reason the topic matters
 - **Wrap**: Revisit central tension, tease what's next
 
-## Output Format
+## Output Format: Three Layers of Depth
 
-The outline has two sections: a **Read-Through Context** section and a **Story Beats** distillate.
+The outline has three sections, ordered from most compressed to most detailed. The producer reads top-down; the quick scan tells you the shape, the story beats give you the improv cues, and the full narrative gives you the context if you need it.
 
-### Section 1: Read-Through Context
+### Layer 1: Quick Scan (the one-pager)
 
-A narrative outline with acts, numbered topics, and explanatory prose. This is for pre-read; understanding the episode arc before recording. Include:
+The highest level view. Just the acts and their major beats; nothing else. This is what you glance at to remember the shape of the episode.
 
-- Episode structure (cold open, acts, wrap)
-- Numbered topic descriptions with enough context to understand the argument
-- Key quotes from the brainstorm worth hitting on air
-- References or props to have handy
+- Act headings (### level)
+- 2-5 **bolded beat titles** per act; no sub-bullets, no explanation
+- The entire quick scan should fit in a single screen
 
-### Section 2: Story Beats (the note cards)
+Example:
 
-This is the distillate Adam actually uses while recording. Rules:
+```
+## Quick Scan
 
-- **Each story beat is a bolded bullet** corresponding to a major topic from the read-through
+### ACT 1: First Principles
+- **Taste vs. judgment**
+- **The apprenticeship grind**
+- **Middle management filter**
+
+### ACT 2: The Execution Collapse
+- **Cost trends to zero**
+- **CTO becomes CEO**
+- **Talent pipeline tension**
+- **The freak artist factor**
+
+### ACT 3: The Education Question
+- **What do I teach 19 year olds?**
+- **Education becomes humanity**
+
+### WRAP
+- **The central tension**
+```
+
+### Layer 2: Story Beats (the note cards)
+
+Expanded version of the quick scan. Same act headings, same bolded beats, but now each beat has up to 3 sub-bullets of 2-3 words each. These are the improv cue cards Adam uses while recording.
+
+Rules:
+- **Each story beat is a bolded bullet** corresponding to a major topic
 - **No more than 3 sub-bullets** under each beat
 - **Sub-bullets are 2-3 words max**; terse thematic prompts, not sentences
-- The goal is to trigger recall, not explain; these are improv cue cards
-- If a specific quote is worth hitting, include it as a beat with 2-3 word sub-bullets explaining how the conversation arrived there
+- If a specific quote is worth hitting, include it as a beat with sub-bullets explaining how the conversation arrived there
+- Keep the story beats to one page if possible
 
 Example:
 
@@ -79,18 +103,16 @@ Example:
   - agents eat business ops
   - technical fluency rises
   - more people can build
-
-### ACT 3: Where This Leads
-
-- **Education shifts**
-  - skills to humanity
-  - writing becomes like Latin
-  - cognitive vs. vocational
 ```
 
-Act headings in the story beats section mirror the acts from the read-through context, so the producer can see the episode structure at a glance while scanning the note cards.
+### Layer 3: Full Narrative (the read-through)
 
-Keep the story beats to one page if possible. Brevity is the entire point.
+The complete narrative outline with acts, numbered topics, explanatory prose, and key quotes. This is for pre-read before recording; understanding the full argument and having context for each beat. Include:
+
+- Episode structure (cold open, acts, wrap)
+- Numbered topic descriptions with enough context to understand the argument
+- Key quotes from the brainstorm worth hitting on air (collected in their own section)
+- References or props to have handy
 
 ## Process
 
@@ -102,9 +124,10 @@ Keep the story beats to one page if possible. Brevity is the entire point.
    - Approximate target runtime? (affects how many beats)
 
 3. **Generate the outline**:
-   - Write the read-through context first (narrative structure)
-   - Then distill into story beats (the note cards)
-   - Include a key quotes section between the two
+   - Write the full narrative first (Layer 3) to understand the episode
+   - Distill into story beats (Layer 2)
+   - Compress into quick scan (Layer 1)
+   - Present in order: Layer 1, Layer 2, Key Quotes, Layer 3
 
 4. **Present to the user for feedback**
 
@@ -122,10 +145,15 @@ Keep the story beats to one page if possible. Brevity is the entire point.
    ```
    Then refresh: `docker compose exec exobrain exobrain project`
 
+6. **Create links** between the outline and its source material:
+   - Outline → `derived-from` → Transcript (if derived from a brainstorm)
+   - Outline → `derived-from` → Concept (if the episode concept exists)
+   - Cross-space `related-to` links for topics that connect to other idea spaces
+
 ## Content Guidelines
 
 - **No dashes or double dashes.** Use semicolons or restructure.
 - Preserve the hosts' phrasing when it captures an idea well.
 - Story beat sub-bullets are fragments, not sentences. Two to three words.
 - Pull quotes should be verbatim from the brainstorm transcript.
-- Keep the tone of the read-through conversational; these are notes between collaborators, not a script.
+- Keep the tone of the full narrative conversational; these are notes between collaborators, not a script.
