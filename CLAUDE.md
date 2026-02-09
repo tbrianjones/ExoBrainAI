@@ -53,6 +53,7 @@ docker compose exec exobrain exobrain status
 | `/generate-view` | User wants production content from an idea |
 | `/generate-poem-view` | User wants poetry; uses Poetic Inquiry methodology |
 | `/generate-academic-infographic-view` | User wants data-focused, academically rigorous infographic specs |
+| `/generate-episode-outline` | Generate Zengineering podcast pre-production outlines from brainstorm transcripts |
 | `/generate-new-view-command` | User wants to create a new specialized view generator |
 | `/publish-quarto` | Publish a view to ideas.tbrianjones.com |
 | `/test-system` | Run end-to-end integration test simulating a real user session |

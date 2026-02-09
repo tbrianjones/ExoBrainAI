@@ -3,7 +3,7 @@
 import html
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from src import __version__
 from src.core.db import db_session, get_db_path
@@ -76,7 +76,7 @@ def _render_markdown(content: str) -> str:
     """Render markdown to sanitized HTML, stripping any YAML frontmatter."""
     import markdown as md
     clean = _strip_frontmatter(content)
-    raw_html = md.markdown(clean, extensions=["fenced_code", "tables"])
+    raw_html = md.markdown(clean, extensions=["fenced_code", "tables"], tab_length=2)
     return _sanitize_html(raw_html)
 
 
@@ -183,6 +183,60 @@ async def object_detail(request: Request, obj_id: str):
             ctx["content_html"] = None
 
     return templates.TemplateResponse("objects/detail.html", ctx)
+
+
+@router.get("/objects/{obj_id}/download")
+async def object_download_markdown(request: Request, obj_id: str):
+    """Download an object as a Markdown file with YAML frontmatter."""
+    db_path = get_db_path()
+    if not db_path.exists():
+        return PlainTextResponse("Database not found", status_code=503)
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        tag_repo = TagRepo(conn)
+
+        obj = obj_repo.get(obj_id)
+        if obj is None:
+            obj = obj_repo.get_by_prefix(obj_id)
+        if obj is None:
+            return PlainTextResponse("Object not found", status_code=404)
+
+        tags = tag_repo.list_for_object(obj["id"])
+
+        # Build YAML frontmatter
+        lines = ["---"]
+        lines.append(f"id: {obj['id']}")
+        title = obj.get("title", "").replace('"', '\\"')
+        lines.append(f'title: "{title}"')
+        lines.append(f"type: {obj.get('type_name', '')}")
+        lines.append(f"space: {obj.get('space_name', '')}")
+        if tags:
+            lines.append(f"tags: [{', '.join(tags)}]")
+        lines.append(f"created: {obj.get('created_at', '')}")
+        lines.append(f"updated: {obj.get('updated_at', '')}")
+        lines.append("---")
+        lines.append("")
+
+        if obj.get("summary"):
+            lines.append(f"**Summary:** {obj['summary']}")
+            lines.append("")
+
+        if obj.get("content"):
+            lines.append(obj["content"])
+
+        md_content = "\n".join(lines)
+
+        # Slugify title for filename
+        slug = re.sub(r"[^\w\s-]", "", obj.get("title", "object").lower())
+        slug = re.sub(r"[\s]+", "-", slug).strip("-") or "object"
+        filename = f"{slug}.md"
+
+        return PlainTextResponse(
+            content=md_content,
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
 
 @router.get("/files", response_class=HTMLResponse)
