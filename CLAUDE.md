@@ -212,6 +212,7 @@ ADRs document key architectural choices. Read these before making significant ch
 | [008](docs/adr/008-agentic-testing-strategy.md) | Three-tier testing: unit tests + agentic integration + fixtures |
 | [009](docs/adr/009-schema-migration-and-data-durability.md) | Forward-only migrations; `init` safe on any DB state |
 | [010](docs/adr/010-web-ui-architecture.md) | Read-only web UI with Jinja2 + HTMX + Tailwind; integrated into FastAPI on `/ui/` |
+| [011](docs/adr/011-primitive-semantics-and-knowledge-gardening.md) | Primitive semantic roles (spaces, types, tags, links); emergent taxonomy; knowledge gardening vision |
 
 ## Behavior
 
