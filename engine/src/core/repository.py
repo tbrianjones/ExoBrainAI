@@ -35,17 +35,29 @@ class ObjectRepo:
         content: str | None = None,
         id: str | None = None,
         source: str = "human",
+        created_at: str | None = None,
     ) -> dict:
         """Create a new object. Returns the created object as a dict.
+
+        Args:
+            created_at: Optional ISO 8601 timestamp. When provided, sets both
+                created_at and updated_at to bypass the auto-trigger.
 
         Note: Does not commit; caller is responsible for transaction management.
         """
         obj_id = id or generate_id()
-        self.conn.execute(
-            """INSERT INTO objects (id, type_id, space_id, title, summary, content, source)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (obj_id, type_id, space_id, title, summary, content, source),
-        )
+        if created_at:
+            self.conn.execute(
+                """INSERT INTO objects (id, type_id, space_id, title, summary, content, source, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (obj_id, type_id, space_id, title, summary, content, source, created_at, created_at),
+            )
+        else:
+            self.conn.execute(
+                """INSERT INTO objects (id, type_id, space_id, title, summary, content, source)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (obj_id, type_id, space_id, title, summary, content, source),
+            )
         return self.get(obj_id)
 
     def get(self, obj_id: str) -> dict | None:

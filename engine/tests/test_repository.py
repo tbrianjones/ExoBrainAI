@@ -60,6 +60,18 @@ class TestObjectRepoCreate:
         assert obj["created_at"] is not None
         assert obj["updated_at"] is not None
 
+    def test_create_with_custom_created_at(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        custom_ts = "2026-01-07T00:00:00.000Z"
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Backdated",
+            created_at=custom_ts,
+        )
+        assert obj["created_at"] == custom_ts
+        assert obj["updated_at"] == custom_ts
+
 
 class TestObjectRepoGet:
     """Test ObjectRepo.get and get_by_prefix."""

@@ -334,6 +334,8 @@ def capture(
     space_name: Optional[str] = typer.Option(None, "--space", help="Space name"),
     tags: Optional[list[str]] = typer.Option(None, "--tag", help="Tag (repeatable)"),
     file_path: Optional[str] = typer.Option(None, "--file", "-f", help="File to attach"),
+    created_at: Optional[str] = typer.Option(None, "--created-at", help="ISO 8601 timestamp for creation date"),
+    always_project: bool = typer.Option(False, "--always-project", help="Always include in projection"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Capture a new object. Content via argument or stdin."""
@@ -371,9 +373,14 @@ def capture(
             title=title or (content[:80] if content else "Untitled"),
             summary=summary,
             content=content or None,
+            created_at=created_at,
         )
 
         try:
+            # Set projection override if requested
+            if always_project:
+                obj_repo.update(obj["id"], projection_override="always")
+
             # Add tags
             if tags:
                 tag_repo = TagRepo(conn)
