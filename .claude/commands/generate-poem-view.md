@@ -249,6 +249,19 @@ echo "[content]" | docker compose exec -T exobrain exobrain capture \
 ```
 Then refresh: `docker compose exec exobrain exobrain project`
 
+### Create Provenance Links
+
+After saving, parse the object ID from the capture response, then link back to source material:
+- Link to each source transcript: `docker compose exec exobrain exobrain link create <new-id> <transcript-id> "derived-from" --json`
+- Link to the concept object: `docker compose exec exobrain exobrain link create <new-id> <concept-id> "derived-from" --json`
+- For verbatim phrases preserved from a specific source: use `references` instead of `derived-from`
+
+To find source objects:
+```bash
+docker compose exec exobrain exobrain list --space "ideas/[space-name]" --tag transcript --json
+docker compose exec exobrain exobrain list --space "ideas/[space-name]" --tag idea-readme --json
+```
+
 ### File Format
 
 ```yaml

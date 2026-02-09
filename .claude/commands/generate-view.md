@@ -79,6 +79,18 @@ When writing prose:
    ```
    Then refresh: `docker compose exec exobrain exobrain project`
 
+7. **Create provenance links**:
+   After saving, parse the object ID from the capture response, then link back to source material:
+   - Link to each source transcript: `docker compose exec exobrain exobrain link create <new-id> <transcript-id> "derived-from" --json`
+   - Link to the concept object: `docker compose exec exobrain exobrain link create <new-id> <concept-id> "derived-from" --json`
+   - For content that references specific objects: use `references` instead of `derived-from`
+
+   To find source objects:
+   ```bash
+   docker compose exec exobrain exobrain list --space "ideas/[space-name]" --tag transcript --json
+   docker compose exec exobrain exobrain list --space "ideas/[space-name]" --tag idea-readme --json
+   ```
+
 ## File Structure
 
 The content should begin with YAML frontmatter:

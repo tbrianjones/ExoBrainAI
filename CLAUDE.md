@@ -181,6 +181,8 @@ echo "[content]" | docker compose exec -T exobrain exobrain capture \
 docker compose exec exobrain exobrain project
 ```
 
+**Linking provenance**: When creating content in an idea space (views, documents, responses), always link the new object back to its sources using `derived-from` for transcripts and concepts it was generated from, and `references` for specific objects it cites. This applies both inside commands and in ad-hoc creation.
+
 **Discovering spaces**: `docker compose exec exobrain exobrain space list --json` (filter for `ideas/`)
 
 Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` handle this automatically.
