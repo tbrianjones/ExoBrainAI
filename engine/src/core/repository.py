@@ -20,6 +20,14 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+_SORT_COLUMNS = {
+    "id": "o.id",
+    "type": "t.title",
+    "title": "o.title",
+    "created": "o.created_at",
+}
+
+
 class ObjectRepo:
     """CRUD operations for ExoBrain objects."""
 
@@ -125,6 +133,8 @@ class ObjectRepo:
         limit: int = 50,
         offset: int = 0,
         include_system: bool = False,
+        sort_by: str = "created",
+        sort_order: str = "desc",
     ) -> list[dict]:
         """List objects with optional filters."""
         query = """
@@ -161,7 +171,9 @@ class ObjectRepo:
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
-        query += " ORDER BY o.created_at DESC LIMIT ? OFFSET ?"
+        sort_col = _SORT_COLUMNS.get(sort_by, "o.created_at")
+        order = "ASC" if sort_order.lower() == "asc" else "DESC"
+        query += f" ORDER BY {sort_col} {order} LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         rows = self.conn.execute(query, params).fetchall()
@@ -241,17 +253,33 @@ class ObjectRepo:
 
         return cursor.rowcount > 0
 
-    def search(self, query: str, limit: int = 20, include_system: bool = False) -> list[dict]:
+    def search(
+        self,
+        query: str,
+        limit: int = 20,
+        include_system: bool = False,
+        sort_by: str | None = None,
+        sort_order: str = "desc",
+    ) -> list[dict]:
         """Full-text search across title, summary, and content.
 
         User input is quoted to prevent FTS5 syntax injection (AND, OR, NOT,
         NEAR, column filters, etc.). Special characters like +, *, (, ) in
         raw queries would otherwise cause FTS5 parse errors.
+
+        When sort_by is None, results are ordered by FTS rank (relevance).
         """
         # Quote the query to force literal matching; escape internal quotes
         safe_query = '"' + query.replace('"', '""') + '"'
 
         system_filter = "" if include_system else "AND o.is_system_object = 0"
+
+        if sort_by and sort_by in _SORT_COLUMNS:
+            sort_col = _SORT_COLUMNS[sort_by]
+            order = "ASC" if sort_order.lower() == "asc" else "DESC"
+            order_clause = f"ORDER BY {sort_col} {order}"
+        else:
+            order_clause = "ORDER BY rank"
 
         rows = self.conn.execute(
             f"""SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
@@ -265,7 +293,7 @@ class ObjectRepo:
                JOIN objects s ON o.space_id = s.id
                WHERE objects_fts MATCH ?
                {system_filter}
-               ORDER BY rank
+               {order_clause}
                LIMIT ?""",
             (safe_query, limit),
         ).fetchall()

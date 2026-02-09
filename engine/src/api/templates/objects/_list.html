@@ -2,29 +2,46 @@
     <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">ID</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Title</th>
+                {% for col, label in [('id', 'ID'), ('type', 'Type'), ('title', 'Title'), ('created', 'Created')] %}
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">
+                    <button class="flex items-center gap-1 hover:text-gray-900 cursor-pointer"
+                            hx-get="/ui-api/objects?offset=0"
+                            hx-target="#object-list"
+                            hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order']"
+                            onclick="exoSort('{{ col }}')">
+                        {{ label }}
+                        {% if sort == col %}
+                        <span class="text-blue-500">{{ '\u25b2' if order == 'asc' else '\u25bc' }}</span>
+                        {% endif %}
+                    </button>
+                </th>
+                {% endfor %}
                 <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Tags</th>
-                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Created</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for obj in objects %}
             <tr class="hover:bg-gray-50">
-                <td class="px-4 py-2 font-mono text-xs text-gray-500"><a href="/ui/objects/{{ obj.id }}" class="hover:text-blue-600">{{ obj.id[:8] }}</a></td>
+                <td class="px-4 py-2 font-mono text-xs text-gray-500 whitespace-nowrap">
+                    <a href="/ui/objects/{{ obj.id }}" class="hover:text-blue-600">{{ obj.id }}</a>
+                </td>
                 <td class="px-4 py-2">
                     <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700">{{ obj.type_name }}</span>
                 </td>
-                <td class="px-4 py-2 text-gray-900 font-medium">
-                    <a href="/ui/objects/{{ obj.id }}" class="hover:text-blue-600">{{ obj.title }}</a>
+                <td class="px-4 py-2">
+                    <a href="/ui/objects/{{ obj.id }}" class="hover:text-blue-600">
+                        <div class="text-gray-900 font-medium">{{ obj.title }}</div>
+                        {% if obj.summary %}
+                        <div class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ obj.summary }}</div>
+                        {% endif %}
+                    </a>
                 </td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ obj.created_at[:10] if obj.created_at else '' }}</td>
                 <td class="px-4 py-2">
                     {% for tag in obj.tags %}
                     <span class="inline-block px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-600 mr-1">{{ tag }}</span>
                     {% endfor %}
                 </td>
-                <td class="px-4 py-2 text-xs text-gray-500">{{ obj.created_at[:10] if obj.created_at else '' }}</td>
             </tr>
             {% else %}
             <tr>
@@ -44,20 +61,33 @@
     <div class="flex gap-2">
         {% if offset > 0 %}
         <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
-                hx-get="/ui-api/objects?offset={{ [offset - limit, 0] | max }}&limit={{ limit }}"
+                hx-get="/ui-api/objects?offset={{ [offset - limit, 0] | max }}&limit={{ limit }}&sort={{ sort }}&order={{ order }}"
                 hx-target="#object-list"
-                hx-include="[name='q'],[name='type'],[name='space'],[name='tag']">
+                hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system']">
             Previous
         </button>
         {% endif %}
         {% if objects|length == limit %}
         <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
-                hx-get="/ui-api/objects?offset={{ offset + limit }}&limit={{ limit }}"
+                hx-get="/ui-api/objects?offset={{ offset + limit }}&limit={{ limit }}&sort={{ sort }}&order={{ order }}"
                 hx-target="#object-list"
-                hx-include="[name='q'],[name='type'],[name='space'],[name='tag']">
+                hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system']">
             Next
         </button>
         {% endif %}
     </div>
 </div>
 {% endif %}
+
+<script>
+function exoSort(col) {
+    var sf = document.getElementById('sort-field');
+    var of = document.getElementById('order-field');
+    if (sf.value === col) {
+        of.value = of.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sf.value = col;
+        of.value = col === 'created' ? 'desc' : 'asc';
+    }
+}
+</script>

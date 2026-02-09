@@ -87,6 +87,17 @@ async def dashboard_stats(request: Request):
 # Object listing (HTMX partial)
 # ---------------------------------------------------------------------------
 
+_VALID_SORT_COLS = {"id", "type", "title", "created"}
+
+# Hex chars + dashes that appear in UUIDs
+_UUID_CHARS = set("0123456789abcdef-")
+
+
+def _looks_like_uuid_prefix(q: str) -> bool:
+    """Check if query could be the start of a UUID."""
+    return len(q) >= 3 and all(c in _UUID_CHARS for c in q.lower())
+
+
 @router.get("/objects", response_class=HTMLResponse)
 async def list_objects(
     request: Request,
@@ -97,6 +108,8 @@ async def list_objects(
     system: str = "",
     limit: int = 50,
     offset: int = 0,
+    sort: str = "created",
+    order: str = "desc",
 ):
     """Return object list as an HTML fragment."""
     templates = _templates(request)
@@ -105,6 +118,12 @@ async def list_objects(
     limit = min(max(1, limit), MAX_LIMIT)
     offset = max(0, offset)
     include_system = system == "1"
+
+    # Validate sort params
+    if sort not in _VALID_SORT_COLS:
+        sort = "created"
+    if order not in ("asc", "desc"):
+        order = "desc"
 
     db_path = get_db_path()
     if not db_path.exists():
@@ -115,9 +134,42 @@ async def list_objects(
         tag_repo = TagRepo(conn)
 
         if q.strip():
-            # Fetch enough results to cover the offset + page
-            objects = obj_repo.search(q.strip(), limit=offset + limit, include_system=include_system)
-            objects = objects[offset:]
+            query_text = q.strip()
+
+            # Search by ID prefix alongside FTS
+            search_sort = sort if sort != "created" or order != "desc" else None
+            objects = obj_repo.search(
+                query_text,
+                limit=offset + limit,
+                include_system=include_system,
+                sort_by=search_sort,
+                sort_order=order,
+            )
+
+            # Also search by ID prefix if query looks like a UUID
+            if _looks_like_uuid_prefix(query_text):
+                system_filter = "" if include_system else "AND o.is_system_object = 0"
+                id_rows = conn.execute(
+                    f"""SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
+                               o.created_at, o.updated_at,
+                               t.title as type_name,
+                               s.title as space_name
+                        FROM objects o
+                        JOIN objects t ON o.type_id = t.id
+                        JOIN objects s ON o.space_id = s.id
+                        WHERE o.id LIKE ? ESCAPE '\\'
+                        {system_filter}
+                        LIMIT ?""",
+                    (query_text.lower() + "%", limit),
+                ).fetchall()
+                # Merge ID matches (deduplicate by id)
+                seen_ids = {obj["id"] for obj in objects}
+                for row in id_rows:
+                    if row["id"] not in seen_ids:
+                        objects.insert(0, dict(row))
+                        seen_ids.add(row["id"])
+
+            objects = objects[offset:offset + limit]
         else:
             objects = obj_repo.list(
                 type_name=type or None,
@@ -126,6 +178,8 @@ async def list_objects(
                 limit=limit,
                 offset=offset,
                 include_system=include_system,
+                sort_by=sort,
+                sort_order=order,
             )
 
         # Batch fetch tags (avoids N+1 query)
@@ -147,6 +201,8 @@ async def list_objects(
         "objects": objects,
         "limit": limit,
         "offset": offset,
+        "sort": sort,
+        "order": order,
     }
     return templates.TemplateResponse("objects/_list.html", ctx)
 
