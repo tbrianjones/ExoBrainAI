@@ -160,8 +160,17 @@ class ObjectRepo:
             conditions.append("o.is_system_object = 0")
 
         if space_name:
-            conditions.append("LOWER(s.title) = ?")
+            # Match objects IN the space, objects in child spaces,
+            # and the space/subspace objects themselves (type = 'Space')
+            conditions.append(
+                "(LOWER(s.title) = ? OR LOWER(s.title) LIKE ?"
+                " OR (LOWER(t.title) = 'space'"
+                "     AND (LOWER(o.title) = ? OR LOWER(o.title) LIKE ?)))"
+            )
             params.append(space_name.lower())
+            params.append(space_name.lower() + "/%")
+            params.append(space_name.lower())
+            params.append(space_name.lower() + "/%")
 
         if tag:
             query += " JOIN object_tags ot ON o.id = ot.object_id"
