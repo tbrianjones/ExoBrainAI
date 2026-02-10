@@ -166,6 +166,71 @@ WHERE id IN (SELECT object_id FROM object_tags WHERE tag_text = 'view')
 AND type_id = '00000000-0000-7000-8000-000000000004';
 """
 
+MIGRATION_007 = """
+-- Object versioning: track version number (starts at 1, incremented by trigger)
+ALTER TABLE objects ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+
+-- Content hash: SHA-256 of title + summary + content for change detection
+ALTER TABLE objects ADD COLUMN content_hash TEXT;
+
+-- Soft delete: NULL means active, ISO 8601 timestamp means deleted
+ALTER TABLE objects ADD COLUMN deleted_at TEXT;
+
+-- Index for efficient soft-delete filtering
+CREATE INDEX IF NOT EXISTS idx_objects_deleted_at ON objects(deleted_at);
+
+-- History table: stores previous versions of objects.
+-- No FK to objects(id) because history must survive hard deletes (purge).
+CREATE TABLE IF NOT EXISTS object_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    object_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    title TEXT,
+    summary TEXT,
+    content TEXT,
+    content_hash TEXT,
+    changed_by TEXT DEFAULT 'system',
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    UNIQUE(object_id, version)
+);
+CREATE INDEX IF NOT EXISTS idx_object_history_object_id ON object_history(object_id);
+CREATE INDEX IF NOT EXISTS idx_object_history_created_at ON object_history(created_at);
+
+-- Trigger: record previous state into history when content changes.
+-- The WHEN clause uses IS NOT to handle NULL comparisons correctly
+-- (NULL != NULL is NULL in SQL, but NULL IS NOT NULL is true).
+-- Only fires when title, summary, or content actually changes.
+CREATE TRIGGER IF NOT EXISTS objects_history_update
+AFTER UPDATE ON objects
+FOR EACH ROW
+WHEN OLD.title != NEW.title OR OLD.summary IS NOT NEW.summary OR OLD.content IS NOT NEW.content
+BEGIN
+    INSERT OR IGNORE INTO object_history (object_id, version, title, summary, content, content_hash, changed_by)
+    VALUES (OLD.id, OLD.version, OLD.title, OLD.summary, OLD.content, OLD.content_hash, 'system');
+END;
+
+-- Trigger: auto-increment version when content changes.
+-- Uses the same WHEN guard as the history trigger.
+-- The UPDATE inside this trigger does NOT re-fire the history trigger because
+-- it only changes `version`, not title/summary/content.
+CREATE TRIGGER IF NOT EXISTS objects_version_bump
+AFTER UPDATE ON objects
+FOR EACH ROW
+WHEN OLD.title != NEW.title OR OLD.summary IS NOT NEW.summary OR OLD.content IS NOT NEW.content
+BEGIN
+    UPDATE objects SET version = OLD.version + 1 WHERE id = NEW.id;
+END;
+
+-- Backup log: records backup events for write-count triggers
+CREATE TABLE IF NOT EXISTS backup_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    backup_path TEXT NOT NULL,
+    size_bytes INTEGER,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    write_count INTEGER DEFAULT 0
+);
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
@@ -173,4 +238,5 @@ MIGRATIONS: list[tuple[int, str, str]] = [
     (4, "Performance indexes, source, status, is_system_object, link metadata", MIGRATION_004),
     (5, "Move space paths from summary to title", MIGRATION_005),
     (6, "Create View type and retype view-tagged documents", MIGRATION_006),
+    (7, "Object versioning, soft delete, history triggers, backup log", MIGRATION_007),
 ]

@@ -218,18 +218,92 @@ class TestObjectRepoUpdate:
 
 
 class TestObjectRepoDelete:
-    """Test ObjectRepo.delete."""
+    """Test ObjectRepo.delete (soft delete)."""
 
     def test_delete_existing(self, sample_objects):
         conn = sample_objects["conn"]
         repo = ObjectRepo(conn)
         obj_id = sample_objects["obj_c"]["id"]
         assert repo.delete(obj_id) is True
+        # Soft-deleted: invisible to default get, visible with include_deleted
         assert repo.get(obj_id) is None
+        assert repo.get(obj_id, include_deleted=True) is not None
 
     def test_delete_nonexistent_returns_false(self, bootstrapped_db):
         repo = ObjectRepo(bootstrapped_db)
         assert repo.delete("nonexistent-id") is False
+
+    def test_soft_delete_hides_from_list(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.delete(obj_id)
+        results = repo.list()
+        assert not any(r["id"] == obj_id for r in results)
+
+    def test_soft_delete_hides_from_search(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.delete(obj_id)
+        results = repo.search("observation")
+        assert not any(r["id"] == obj_id for r in results)
+
+    def test_soft_delete_hides_from_count(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        count_before = repo.count()
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.delete(obj_id)
+        count_after = repo.count()
+        assert count_after == count_before - 1
+
+    def test_soft_delete_preserves_tags(self, sample_objects):
+        conn = sample_objects["conn"]
+        obj_id = sample_objects["obj_c"]["id"]
+        tag_repo = TagRepo(conn)
+        obj_repo = ObjectRepo(conn)
+        tags_before = tag_repo.list_for_object(obj_id)
+        assert len(tags_before) > 0
+        obj_repo.delete(obj_id)
+        tags_after = tag_repo.list_for_object(obj_id)
+        assert len(tags_after) == len(tags_before)
+
+    def test_undelete_restores_object(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.delete(obj_id)
+        assert repo.get(obj_id) is None
+        restored = repo.undelete(obj_id)
+        assert restored is True
+        assert repo.get(obj_id) is not None
+
+    def test_list_deleted(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.delete(obj_id)
+        deleted_list = repo.list_deleted()
+        assert any(r["id"] == obj_id for r in deleted_list)
+
+    def test_purge_removes_permanently(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        assert repo.purge(obj_id) is True
+        assert repo.get(obj_id, include_deleted=True) is None
+
+    def test_purge_removes_history(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+        # Create a history entry by updating
+        repo.update(obj_id, title="Changed for purge test")
+        assert len(repo.list_history(obj_id)) > 0
+        # Purge should remove both object and history
+        repo.purge(obj_id)
+        assert len(repo.list_history(obj_id)) == 0
 
 
 class TestObjectRepoSearch:
@@ -657,22 +731,22 @@ class TestConstraints:
         )
         assert result is None
 
-    def test_cascade_delete_removes_tags(self, sample_objects):
+    def test_cascade_purge_removes_tags(self, sample_objects):
         conn = sample_objects["conn"]
         obj_id = sample_objects["obj_a"]["id"]
         tag_repo = TagRepo(conn)
         obj_repo = ObjectRepo(conn)
 
-        # Verify tags exist before delete
+        # Verify tags exist before purge
         tags_before = tag_repo.list_for_object(obj_id)
         assert len(tags_before) > 0
 
-        obj_repo.delete(obj_id)
+        obj_repo.purge(obj_id)
 
         tags_after = tag_repo.list_for_object(obj_id)
         assert len(tags_after) == 0
 
-    def test_cascade_delete_removes_links(self, sample_objects):
+    def test_cascade_purge_removes_links(self, sample_objects):
         conn = sample_objects["conn"]
         obj_id = sample_objects["obj_a"]["id"]
         link_repo = LinkRepo(conn)
@@ -682,12 +756,12 @@ class TestConstraints:
         links_before = link_repo.list_all_for(obj_id)
         assert len(links_before) > 0
 
-        obj_repo.delete(obj_id)
+        obj_repo.purge(obj_id)
 
         links_after = link_repo.list_all_for(obj_id)
         assert len(links_after) == 0
 
-    def test_cascade_delete_removes_file_record(self, sample_objects, _patched_settings):
+    def test_cascade_purge_removes_file_record(self, sample_objects, _patched_settings):
         conn = sample_objects["conn"]
         obj_id = sample_objects["obj_a"]["id"]
         file_repo = FileRepo(conn)
@@ -698,11 +772,11 @@ class TestConstraints:
         file_repo.attach(obj_id, source)
         assert file_repo.get(obj_id) is not None
 
-        obj_repo.delete(obj_id)
+        obj_repo.purge(obj_id)
         assert file_repo.get(obj_id) is None
 
-    def test_cascade_delete_removes_file_from_disk(self, sample_objects, _patched_settings):
-        """ObjectRepo.delete() should remove the file from disk via detach."""
+    def test_cascade_purge_removes_file_from_disk(self, sample_objects, _patched_settings):
+        """ObjectRepo.purge() should remove the file from disk."""
         conn = sample_objects["conn"]
         obj_id = sample_objects["obj_a"]["id"]
         file_repo = FileRepo(conn)
@@ -715,7 +789,7 @@ class TestConstraints:
         full_path = file_repo.get_full_path(obj_id)
         assert full_path.exists()
 
-        obj_repo.delete(obj_id)
+        obj_repo.purge(obj_id)
         assert not full_path.exists()
 
 
@@ -801,7 +875,7 @@ class TestFTS5Triggers:
         results_old = repo.search("superposition")
         assert not any(r["id"] == obj_id for r in results_old)
 
-    def test_fts_removes_deleted_object(self, sample_objects):
+    def test_fts_hides_soft_deleted_object(self, sample_objects):
         conn = sample_objects["conn"]
         repo = ObjectRepo(conn)
         obj_id = sample_objects["obj_c"]["id"]
@@ -812,8 +886,21 @@ class TestFTS5Triggers:
 
         repo.delete(obj_id)
 
-        # Should not appear in search after delete
+        # Should not appear in search after soft delete
         results_after = repo.search("observation")
+        assert not any(r["id"] == obj_id for r in results_after)
+
+    def test_fts_removes_purged_object(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+
+        results = repo.search("observation")
+        assert any(r["id"] == obj_id for r in results)
+
+        repo.purge(obj_id)
+
+        results_after = repo.search("observation", include_deleted=True)
         assert not any(r["id"] == obj_id for r in results_after)
 
     def test_fts_reflects_updated_title(self, sample_objects):

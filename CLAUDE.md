@@ -111,8 +111,11 @@ Run via: `docker compose exec exobrain exobrain <command>`
 |---------|-------------|
 | `init` | Create DB, run migrations, bootstrap types/spaces |
 | `status` | Object counts, DB size, integrity |
-| `doctor` | Validate DB integrity, check orphaned files |
+| `doctor` | Validate DB integrity, FTS5, content hashes, orphaned files |
 | `version` | Show version |
+| `backup` | Create a database backup |
+| `backup list` | Show recent backups with sizes and timestamps |
+| `backup restore PATH` | Restore from a backup file (with confirmation) |
 
 ### Objects
 
@@ -122,7 +125,12 @@ Run via: `docker compose exec exobrain exobrain <command>`
 | `get ID` | Full object detail with tags, links, file info |
 | `list` | Filter: `--type`, `--space`, `--tag`, `--limit`, `--offset` |
 | `update ID` | `--title`, `--summary`, `--content`, `--space`, `--always-project`, `--never-project`, `--auto-project` |
-| `delete ID` | Delete with confirmation (`--yes` to skip) |
+| `delete ID` | Soft-delete (recoverable); `--hard` for permanent; `--yes` to skip confirmation |
+| `undelete ID` | Restore a soft-deleted object |
+| `purge ID` | Permanently delete object and all history (`--yes` to skip confirmation) |
+| `deleted` | List all soft-deleted objects |
+| `history ID` | Show version history for an object |
+| `restore ID --version N` | Restore object to a previous version (creates new version) |
 | `search QUERY` | FTS5 search across title, summary, content |
 
 ### Tags, Links, Types, Spaces, Files
@@ -216,8 +224,10 @@ ADRs document key architectural choices. Read these before making significant ch
 | [009](docs/adr/009-schema-migration-and-data-durability.md) | Forward-only migrations; `init` safe on any DB state |
 | [010](docs/adr/010-web-ui-architecture.md) | Read-only web UI with Jinja2 + HTMX + Tailwind; integrated into FastAPI on `/ui/` |
 | [011](docs/adr/011-primitive-semantics-and-knowledge-gardening.md) | Primitive semantic roles (spaces, types, tags, links); emergent taxonomy; knowledge gardening vision |
+| [012](docs/adr/012-object-versioning-and-backup.md) | Object versioning (trigger-based history), soft/hard delete, automated SQLite backup |
 
 ## Behavior
 
 - Always do work in feature branches. Propose this as soon as you launch.
 - **Infrastructure as code.** Never configure infrastructure manually. All configuration in repository files, version controlled, deployed via push.
+- **Pre-migration backups.** Always run `exobrain backup` before applying schema migrations or making architectural database changes.

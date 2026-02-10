@@ -112,6 +112,20 @@ class SearchResult(BaseModel):
     rank: float | None = None
 
 
+class ObjectHistoryEntry(BaseModel):
+    """A single version in an object's history."""
+
+    id: int
+    object_id: str
+    version: int
+    title: str | None = None
+    summary: str | None = None
+    content: str | None = None
+    content_hash: str | None = None
+    changed_by: str = "system"
+    created_at: str | None = None
+
+
 class StatusInfo(BaseModel):
     """System status information."""
 

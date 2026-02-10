@@ -60,6 +60,7 @@ The primary backup mechanism is Dropbox sync of `$EXOBRAIN_DATA_DIR`. Additional
 - SQLite's WAL mode ensures the database is always in a consistent state for file-level copy
 - `exobrain doctor` validates integrity, FTS5 index, and orphaned files at any time
 - The database is a single file; any file-level backup tool works
+- **See [ADR-012](012-object-versioning-and-backup.md)** for the automated backup engine, which provides periodic gzip-compressed snapshots and pre-migration backup guarantees
 
 ## Alternatives Considered
 
@@ -106,6 +107,7 @@ The primary backup mechanism is Dropbox sync of `$EXOBRAIN_DATA_DIR`. Additional
 | 004 | 4 | Performance indexes, `source`, `status`, `is_system_object` columns, link metadata |
 | 005 | 5 | Move space paths from `summary` to `title`; space `title` is now the hierarchical path |
 | 006 | 6 | Create View type and retype view-tagged Document objects to View |
+| 007 | 7 | Object versioning (`version`, `content_hash`, `deleted_at`), `object_history` table, history/version triggers, `backup_log` table |
 
 ## Agent Rules
 

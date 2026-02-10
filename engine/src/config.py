@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     # Watcher settings (legacy)
     watcher_debounce_seconds: float = 2.0
 
+    # Backup settings
+    backup_interval_minutes: int = int(os.environ.get("EXOBRAIN_BACKUP_INTERVAL_MINUTES", "60"))
+    backup_retention_days: int = int(os.environ.get("EXOBRAIN_BACKUP_RETENTION_DAYS", "7"))
+
     # Projection settings
     projection_hot_limit: int = int(os.environ.get("EXOBRAIN_PROJECTION_HOT_LIMIT", "200"))
     projection_recency_weight: float = float(
@@ -112,12 +116,18 @@ class Settings(BaseSettings):
         """Directory for projected markdown files (AI-readable views)."""
         return self.data_dir / "projected"
 
+    @property
+    def backups_dir(self) -> Path:
+        """Directory for automated database backups."""
+        return self.data_dir / "backups"
+
     def ensure_dirs(self) -> None:
         """Create all required directories if they don't exist."""
         # v2 directories
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.files_dir.mkdir(parents=True, exist_ok=True)
         self.projected_dir.mkdir(parents=True, exist_ok=True)
+        self.backups_dir.mkdir(parents=True, exist_ok=True)
 
         # Legacy canonical directories
         for d in [self.raw_dir, self.overlay_dir]:

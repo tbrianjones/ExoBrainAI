@@ -1,5 +1,8 @@
 """ExoBrain HTTP API entry point."""
 
+import asyncio
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -13,10 +16,30 @@ from src.api.routes import admin, docs, health, query
 from src.api.routes import ui, ui_api
 from src.config import settings
 
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage startup/shutdown tasks including the backup daemon."""
+    from src.backup import backup_daemon
+
+    task = asyncio.create_task(backup_daemon())
+    logger.info("Backup daemon started")
+    yield
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Backup daemon stopped")
+
+
 app = FastAPI(
     title="ExoBrain API",
     description="Local-first GraphRAG memory engine",
     version=__version__,
+    lifespan=lifespan,
 )
 
 # CORS for local development

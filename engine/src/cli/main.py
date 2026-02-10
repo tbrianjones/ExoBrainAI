@@ -25,6 +25,7 @@ type_app = typer.Typer(help="Manage object types")
 space_app = typer.Typer(help="Manage spaces")
 file_app = typer.Typer(help="Manage file attachments")
 tier_app = typer.Typer(help="Projection tier management")
+backup_app = typer.Typer(help="Database backup operations")
 graphrag_app = typer.Typer(help="GraphRAG operations (optional)")
 
 app.add_typer(tag_app, name="tag")
@@ -33,6 +34,7 @@ app.add_typer(type_app, name="type")
 app.add_typer(space_app, name="space")
 app.add_typer(file_app, name="file")
 app.add_typer(tier_app, name="tier")
+app.add_typer(backup_app, name="backup")
 app.add_typer(graphrag_app, name="graphrag")
 
 
@@ -181,10 +183,18 @@ def init(
     from src.config import settings
     from src.core.bootstrap import bootstrap
     from src.core.db import check_integrity, init_db
+    from src.core.repository import ObjectRepo
 
     settings.ensure_dirs()
     conn = init_db()
     result = bootstrap(conn)
+
+    # Backfill content hashes for any objects that lack them (post-migration)
+    obj_repo = ObjectRepo(conn)
+    backfilled = obj_repo.backfill_content_hashes()
+    if backfilled > 0:
+        conn.commit()
+
     integrity = check_integrity(conn)
     conn.close()
 
@@ -261,9 +271,10 @@ def status(
 def doctor(
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """Validate DB integrity, check for orphans, run FK check."""
+    """Validate DB integrity, check for orphans, run FK check, verify content hashes."""
     from src.config import settings
     from src.core.db import check_integrity
+    from src.core.repository import ObjectRepo
 
     with _db_session() as conn:
         integrity = check_integrity(conn)
@@ -289,12 +300,18 @@ def doctor(
                     if not row:
                         orphaned_files.append(str(file_path))
 
-    all_ok = integrity["ok"] and fts_ok
+        # Verify content hashes
+        obj_repo = ObjectRepo(conn)
+        hash_mismatches = obj_repo.verify_content_hashes()
+
+    hash_ok = len(hash_mismatches) == 0
+    all_ok = integrity["ok"] and fts_ok and hash_ok
 
     output = {
         "integrity": integrity["integrity"],
         "foreign_key_violations": integrity["foreign_key_violations"],
         "fts_status": fts_status,
+        "content_hash_mismatches": len(hash_mismatches),
         "ok": all_ok,
         "orphaned_files": orphaned_files,
     }
@@ -311,6 +328,12 @@ def doctor(
             typer.echo("[OK] FTS5 index integrity passed")
         else:
             typer.echo(f"[FAIL] FTS5 integrity: {fts_status}")
+        if hash_ok:
+            typer.echo("[OK] Content hash verification passed")
+        else:
+            typer.echo(f"[WARN] {len(hash_mismatches)} content hash mismatches")
+            for m in hash_mismatches[:5]:
+                typer.echo(f"  {m['id'][:12]}  {m['title']}")
         if orphaned_files:
             typer.echo(f"[WARN] {len(orphaned_files)} orphaned files on disk")
             for f in orphaned_files[:5]:
@@ -545,10 +568,11 @@ def update(
 @app.command()
 def delete(
     id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    hard: bool = typer.Option(False, "--hard", help="Permanently delete (purge) instead of soft delete"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
-    """Delete an object and all its tags, links, and file."""
+    """Soft-delete an object (recoverable). Use --hard to permanently remove."""
     from src.core.bootstrap import BOOTSTRAP_IDS
     from src.core.repository import ObjectRepo
 
@@ -562,25 +586,220 @@ def delete(
             raise typer.Exit(1)
 
         obj_repo = ObjectRepo(conn)
-        obj = obj_repo.get(obj_id)
+        obj = obj_repo.get(obj_id, include_deleted=True)
+
+        if hard:
+            action = "Permanently delete"
+        else:
+            action = "Delete"
 
         if not yes:
-            typer.confirm(f"Delete '{obj['title']}' ({obj_id})?", abort=True)
+            typer.confirm(f"{action} '{obj['title']}' ({obj_id})?", abort=True)
 
-        # ObjectRepo.delete() handles CASCADE + disk cleanup
-        deleted = obj_repo.delete(obj_id)
+        if hard:
+            deleted = obj_repo.purge(obj_id)
+        else:
+            deleted = obj_repo.delete(obj_id)
         conn.commit()
 
-    result = {"id": obj_id, "deleted": deleted, "title": obj["title"]}
+    mode = "purged" if hard else "deleted"
+    result = {"id": obj_id, mode: deleted, "title": obj["title"]}
 
     if json_output:
         typer.echo(json.dumps(result, indent=2))
     else:
         if deleted:
-            typer.echo(f"Deleted: {obj['title']} ({obj_id})")
+            typer.echo(f"{action}d: {obj['title']} ({obj_id})")
         else:
-            typer.echo(f"Failed to delete: {obj_id}", err=True)
+            typer.echo(f"Failed to {action.lower()}: {obj_id}", err=True)
             raise typer.Exit(1)
+
+
+@app.command()
+def undelete(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Restore a soft-deleted object."""
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        # Resolve including deleted objects
+        obj_repo = ObjectRepo(conn)
+        resolved = obj_repo.resolve_id(id_or_prefix, include_deleted=True)
+        if not resolved:
+            typer.echo(f"Object not found: {id_or_prefix}", err=True)
+            raise typer.Exit(1)
+
+        obj = obj_repo.get(resolved, include_deleted=True)
+        if obj and not obj.get("deleted_at"):
+            typer.echo(f"Object is not deleted: {resolved}", err=True)
+            raise typer.Exit(1)
+
+        restored = obj_repo.undelete(resolved)
+        conn.commit()
+
+    result = {"id": resolved, "restored": restored, "title": obj["title"]}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        if restored:
+            typer.echo(f"Restored: {obj['title']} ({resolved})")
+        else:
+            typer.echo(f"Failed to restore: {resolved}", err=True)
+            raise typer.Exit(1)
+
+
+@app.command()
+def purge(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Permanently delete an object and all its history."""
+    from src.core.bootstrap import BOOTSTRAP_IDS
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        resolved = obj_repo.resolve_id(id_or_prefix, include_deleted=True)
+        if not resolved:
+            typer.echo(f"Object not found: {id_or_prefix}", err=True)
+            raise typer.Exit(1)
+
+        bootstrap_ids = set(BOOTSTRAP_IDS.values())
+        if resolved in bootstrap_ids:
+            typer.echo(f"Cannot purge bootstrap object: {resolved}", err=True)
+            raise typer.Exit(1)
+
+        obj = obj_repo.get(resolved, include_deleted=True)
+
+        if not yes:
+            typer.confirm(
+                f"Permanently delete '{obj['title']}' ({resolved}) and all history?",
+                abort=True,
+            )
+
+        purged = obj_repo.purge(resolved)
+        conn.commit()
+
+    result = {"id": resolved, "purged": purged, "title": obj["title"]}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        if purged:
+            typer.echo(f"Purged: {obj['title']} ({resolved})")
+        else:
+            typer.echo(f"Failed to purge: {resolved}", err=True)
+            raise typer.Exit(1)
+
+
+@app.command()
+def deleted(
+    limit: int = typer.Option(50, "--limit", "-n", help="Max results"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List all soft-deleted objects."""
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        objects = obj_repo.list_deleted(limit=limit)
+
+    if json_output:
+        _output(objects, as_json=True)
+    else:
+        if not objects:
+            typer.echo("No deleted objects found.")
+        else:
+            typer.echo(f"Deleted objects ({len(objects)}):")
+            for obj in objects:
+                obj_id = obj.get("id", "?")[:12]
+                type_name = obj.get("type_name", "?")
+                title = obj.get("title", "untitled")
+                deleted_at = obj.get("deleted_at", "?")
+                typer.echo(f"  {obj_id}  [{type_name}]  {title}  (deleted: {deleted_at})")
+
+
+@app.command()
+def history(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Show version history for an object."""
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        resolved = obj_repo.resolve_id(id_or_prefix, include_deleted=True)
+        if not resolved:
+            typer.echo(f"Object not found: {id_or_prefix}", err=True)
+            raise typer.Exit(1)
+
+        obj = obj_repo.get(resolved, include_deleted=True)
+        entries = obj_repo.list_history(resolved)
+
+    if json_output:
+        typer.echo(json.dumps({
+            "object_id": resolved,
+            "title": obj["title"] if obj else "?",
+            "current_version": obj.get("version", 1) if obj else None,
+            "history": entries,
+        }, indent=2, default=str))
+    else:
+        if obj:
+            typer.echo(f"History for: {obj['title']} ({resolved})")
+            typer.echo(f"Current version: {obj.get('version', 1)}")
+        if not entries:
+            typer.echo("  No previous versions recorded.")
+        else:
+            typer.echo()
+            for entry in entries:
+                typer.echo(f"  v{entry['version']}  {entry['created_at']}  by {entry.get('changed_by', 'system')}")
+                typer.echo(f"         Title: {entry['title']}")
+                if entry.get('summary'):
+                    snippet = entry['summary'][:80]
+                    typer.echo(f"         Summary: {snippet}")
+
+
+@app.command()
+def restore(
+    id_or_prefix: str = typer.Argument(..., help="Object ID or prefix"),
+    version: int = typer.Option(..., "--version", "-v", help="Version number to restore"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Restore an object to a previous version (creates a new version with old content)."""
+    from src.core.repository import ObjectRepo
+
+    with _db_session() as conn:
+        obj_repo = ObjectRepo(conn)
+        resolved = obj_repo.resolve_id(id_or_prefix, include_deleted=True)
+        if not resolved:
+            typer.echo(f"Object not found: {id_or_prefix}", err=True)
+            raise typer.Exit(1)
+
+        historical = obj_repo.get_version(resolved, version)
+        if not historical:
+            typer.echo(f"Version {version} not found for object {resolved}", err=True)
+            raise typer.Exit(1)
+
+        # Apply the historical content as a new update (creates a new version)
+        obj = obj_repo.update(
+            resolved,
+            title=historical["title"],
+            summary=historical["summary"],
+            content=historical["content"],
+        )
+        conn.commit()
+
+    if json_output:
+        _output(obj, as_json=True)
+    else:
+        typer.echo(f"Restored {resolved} to version {version}")
+        typer.echo(f"  New version: {obj.get('version', '?')}")
+        typer.echo(f"  Title: {obj['title']}")
 
 
 @app.command()
@@ -1082,6 +1301,83 @@ def tier_status(
             typer.echo("Never project:")
             for obj in status['never_project']:
                 typer.echo(f"  {obj['id']}  {obj['title']}")
+
+
+# === Backup Commands ===
+
+
+@backup_app.callback(invoke_without_command=True)
+def backup_default(
+    ctx: typer.Context,
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Create a database backup (default action), or use subcommands."""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    from src.backup import create_backup
+
+    info = create_backup()
+
+    if json_output:
+        typer.echo(json.dumps(info.to_dict(), indent=2))
+    else:
+        typer.echo(f"Backup created: {info.path.name}")
+        typer.echo(f"  Size: {info.size_bytes:,} bytes")
+        typer.echo(f"  Path: {info.path}")
+
+
+@backup_app.command("list")
+def backup_list(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """List recent backups with sizes and timestamps."""
+    from src.backup import list_backups
+
+    backups = list_backups()
+
+    if json_output:
+        typer.echo(json.dumps([b.to_dict() for b in backups], indent=2))
+    else:
+        if not backups:
+            typer.echo("No backups found.")
+        else:
+            typer.echo(f"Backups ({len(backups)}):")
+            for b in backups:
+                age = b.created_at.strftime("%Y-%m-%d %H:%M UTC")
+                typer.echo(f"  {b.path.name}  {b.size_bytes:>10,} bytes  {age}")
+
+
+@backup_app.command("restore")
+def backup_restore(
+    path: str = typer.Argument(..., help="Path to backup file (.db or .db.gz)"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Restore the database from a backup file."""
+    from pathlib import Path as P
+
+    from src.backup import restore_backup
+
+    backup_path = P(path)
+    if not backup_path.exists():
+        typer.echo(f"Backup file not found: {path}", err=True)
+        raise typer.Exit(1)
+
+    if not yes:
+        typer.confirm(
+            f"This will overwrite the current database with {backup_path.name}. Continue?",
+            abort=True,
+        )
+
+    restore_backup(backup_path)
+
+    result = {"restored_from": str(backup_path), "status": "ok"}
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        typer.echo(f"Restored database from: {backup_path.name}")
 
 
 # === GraphRAG Commands (Phase 6; placeholder) ===

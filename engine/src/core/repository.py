@@ -20,6 +20,15 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def compute_content_hash(title: str, summary: str | None, content: str | None) -> str:
+    """Compute SHA-256 hash of an object's content fields.
+
+    Used for change detection: if the hash matches, no history entry is created.
+    """
+    raw = f"{title}\0{summary or ''}\0{content or ''}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 _SORT_COLUMNS = {
     "id": "o.id",
     "type": "t.title",
@@ -54,37 +63,43 @@ class ObjectRepo:
         Note: Does not commit; caller is responsible for transaction management.
         """
         obj_id = id or generate_id()
+        content_hash = compute_content_hash(title, summary, content)
         if created_at:
             self.conn.execute(
-                """INSERT INTO objects (id, type_id, space_id, title, summary, content, source, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (obj_id, type_id, space_id, title, summary, content, source, created_at, created_at),
+                """INSERT INTO objects (id, type_id, space_id, title, summary, content, source, content_hash, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (obj_id, type_id, space_id, title, summary, content, source, content_hash, created_at, created_at),
             )
         else:
             self.conn.execute(
-                """INSERT INTO objects (id, type_id, space_id, title, summary, content, source)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (obj_id, type_id, space_id, title, summary, content, source),
+                """INSERT INTO objects (id, type_id, space_id, title, summary, content, source, content_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (obj_id, type_id, space_id, title, summary, content, source, content_hash),
             )
         return self.get(obj_id)
 
-    def get(self, obj_id: str) -> dict | None:
-        """Get an object by ID. Returns None if not found."""
+    def get(self, obj_id: str, include_deleted: bool = False) -> dict | None:
+        """Get an object by ID. Returns None if not found or soft-deleted.
+
+        Args:
+            include_deleted: If True, return soft-deleted objects too.
+        """
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
         row = self.conn.execute(
-            """SELECT o.*,
+            f"""SELECT o.*,
                       t.title as type_name,
                       s.title as space_name
                FROM objects o
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
-               WHERE o.id = ?""",
+               WHERE o.id = ? {deleted_filter}""",
             (obj_id,),
         ).fetchone()
         if row is None:
             return None
         return dict(row)
 
-    def get_by_prefix(self, prefix: str) -> dict | None:
+    def get_by_prefix(self, prefix: str, include_deleted: bool = False) -> dict | None:
         """Get an object by ID prefix (minimum 8 characters).
 
         Returns None if no match or multiple matches.
@@ -92,25 +107,27 @@ class ObjectRepo:
         if len(prefix) < 8:
             return None
         safe_prefix = _escape_like(prefix)
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
         rows = self.conn.execute(
-            """SELECT o.*,
+            f"""SELECT o.*,
                       t.title as type_name,
                       s.title as space_name
                FROM objects o
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
-               WHERE o.id LIKE ? ESCAPE '\\'""",
+               WHERE o.id LIKE ? ESCAPE '\\' {deleted_filter}""",
             (safe_prefix + "%",),
         ).fetchall()
         if len(rows) == 1:
             return dict(rows[0])
         return None
 
-    def resolve_id(self, id_or_prefix: str) -> str | None:
+    def resolve_id(self, id_or_prefix: str, include_deleted: bool = False) -> str | None:
         """Resolve a full ID or prefix to a full ID. Returns None if unresolvable."""
+        deleted_filter = "" if include_deleted else "AND deleted_at IS NULL"
         # Try exact match first
         row = self.conn.execute(
-            "SELECT id FROM objects WHERE id = ?", (id_or_prefix,)
+            f"SELECT id FROM objects WHERE id = ? {deleted_filter}", (id_or_prefix,)
         ).fetchone()
         if row:
             return row["id"]
@@ -118,7 +135,7 @@ class ObjectRepo:
         if len(id_or_prefix) >= 8:
             safe_prefix = _escape_like(id_or_prefix)
             rows = self.conn.execute(
-                "SELECT id FROM objects WHERE id LIKE ? ESCAPE '\\'",
+                f"SELECT id FROM objects WHERE id LIKE ? ESCAPE '\\' {deleted_filter}",
                 (safe_prefix + "%",),
             ).fetchall()
             if len(rows) == 1:
@@ -133,6 +150,7 @@ class ObjectRepo:
         limit: int = 50,
         offset: int = 0,
         include_system: bool = False,
+        include_deleted: bool = False,
         sort_by: str = "created",
         sort_order: str = "desc",
     ) -> list[dict]:
@@ -148,6 +166,9 @@ class ObjectRepo:
         """
         conditions = []
         params = []
+
+        if not include_deleted:
+            conditions.append("o.deleted_at IS NULL")
 
         if type_name:
             # Type filter takes precedence: when explicitly filtering by type,
@@ -199,20 +220,28 @@ class ObjectRepo:
     ) -> dict | None:
         """Update an object's mutable fields. Returns updated object or None.
 
+        Computes content_hash for change detection. If content fields change,
+        the hash is updated and triggers record history automatically.
+
         Args:
             projection_override: 'always', 'never', None (score-based), or ... (not provided)
         """
         fields = []
         params = []
+        content_fields_changed = False
+
         if title is not None:
             fields.append("title = ?")
             params.append(title)
+            content_fields_changed = True
         if summary is not None:
             fields.append("summary = ?")
             params.append(summary)
+            content_fields_changed = True
         if content is not None:
             fields.append("content = ?")
             params.append(content)
+            content_fields_changed = True
         if space_id is not None:
             fields.append("space_id = ?")
             params.append(space_id)
@@ -222,6 +251,38 @@ class ObjectRepo:
 
         if not fields:
             return self.get(obj_id)
+
+        # Compute new content_hash if content fields changed
+        if content_fields_changed:
+            current = self.get(obj_id, include_deleted=True)
+            if current is None:
+                return None
+            new_title = title if title is not None else current["title"]
+            new_summary = summary if summary is not None else current["summary"]
+            new_content = content if content is not None else current["content"]
+            new_hash = compute_content_hash(new_title, new_summary, new_content)
+
+            # Skip no-op: if hash matches current, no actual content change
+            if current.get("content_hash") == new_hash:
+                # Still apply non-content field changes (space, projection_override)
+                non_content_fields = []
+                non_content_params = []
+                if space_id is not None:
+                    non_content_fields.append("space_id = ?")
+                    non_content_params.append(space_id)
+                if projection_override is not ...:
+                    non_content_fields.append("projection_override = ?")
+                    non_content_params.append(projection_override)
+                if non_content_fields:
+                    non_content_params.append(obj_id)
+                    self.conn.execute(
+                        f"UPDATE objects SET {', '.join(non_content_fields)} WHERE id = ?",
+                        non_content_params,
+                    )
+                return self.get(obj_id)
+
+            fields.append("content_hash = ?")
+            params.append(new_hash)
 
         # updated_at is set automatically by the objects_auto_updated_at trigger
         params.append(obj_id)
@@ -233,19 +294,37 @@ class ObjectRepo:
         return self.get(obj_id)
 
     def delete(self, obj_id: str) -> bool:
-        """Delete an object and its tags/links/file (via CASCADE).
+        """Soft-delete an object by setting deleted_at timestamp.
 
-        Reads the file path first, then deletes the object (CASCADE removes
-        the files DB row), then cleans up the file on disk. This ordering
-        ensures the DB is consistent even if disk cleanup fails.
+        Tags, links, and files remain attached. The object becomes invisible
+        to list/search/get by default but can be recovered with undelete().
 
         Note: Does not commit; caller is responsible for transaction management.
-        Returns True if deleted.
+        Returns True if soft-deleted.
+        """
+        cursor = self.conn.execute(
+            "UPDATE objects SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND deleted_at IS NULL",
+            (obj_id,),
+        )
+        return cursor.rowcount > 0
+
+    def purge(self, obj_id: str) -> bool:
+        """Permanently delete an object, its history, tags, links, and file.
+
+        This is a hard delete with CASCADE. Also removes all history entries.
+        Cleans up any attached file on disk.
+
+        Note: Does not commit; caller is responsible for transaction management.
+        Returns True if purged.
         """
         # Read file path before deleting (CASCADE will remove the files row)
         file_repo = FileRepo(self.conn)
         file_info = file_repo.get(obj_id)
 
+        # Remove history (no FK, so must be explicit)
+        self.conn.execute("DELETE FROM object_history WHERE object_id = ?", (obj_id,))
+
+        # Hard delete the object (CASCADE removes tags, links, files rows)
         cursor = self.conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
 
         # Clean up disk file after DB delete (with path traversal guard)
@@ -262,11 +341,60 @@ class ObjectRepo:
 
         return cursor.rowcount > 0
 
+    def undelete(self, obj_id: str) -> bool:
+        """Restore a soft-deleted object by clearing deleted_at.
+
+        Note: Does not commit; caller is responsible for transaction management.
+        Returns True if restored.
+        """
+        cursor = self.conn.execute(
+            "UPDATE objects SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL",
+            (obj_id,),
+        )
+        return cursor.rowcount > 0
+
+    def list_deleted(self, limit: int = 50) -> list[dict]:
+        """List all soft-deleted objects."""
+        rows = self.conn.execute(
+            """SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
+                      o.created_at, o.updated_at, o.deleted_at,
+                      t.title as type_name,
+                      s.title as space_name
+               FROM objects o
+               JOIN objects t ON o.type_id = t.id
+               JOIN objects s ON o.space_id = s.id
+               WHERE o.deleted_at IS NOT NULL
+               ORDER BY o.deleted_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def list_history(self, obj_id: str) -> list[dict]:
+        """Return all history entries for an object, ordered by version."""
+        rows = self.conn.execute(
+            """SELECT * FROM object_history
+               WHERE object_id = ?
+               ORDER BY version ASC""",
+            (obj_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_version(self, obj_id: str, version: int) -> dict | None:
+        """Return a specific historical version of an object."""
+        row = self.conn.execute(
+            """SELECT * FROM object_history
+               WHERE object_id = ? AND version = ?""",
+            (obj_id, version),
+        ).fetchone()
+        return dict(row) if row else None
+
     def search(
         self,
         query: str,
         limit: int = 20,
         include_system: bool = False,
+        include_deleted: bool = False,
         sort_by: str | None = None,
         sort_order: str = "desc",
     ) -> list[dict]:
@@ -282,6 +410,7 @@ class ObjectRepo:
         safe_query = '"' + query.replace('"', '""') + '"'
 
         system_filter = "" if include_system else "AND o.is_system_object = 0"
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
 
         if sort_by and sort_by in _SORT_COLUMNS:
             sort_col = _SORT_COLUMNS[sort_by]
@@ -302,33 +431,40 @@ class ObjectRepo:
                JOIN objects s ON o.space_id = s.id
                WHERE objects_fts MATCH ?
                {system_filter}
+               {deleted_filter}
                {order_clause}
                LIMIT ?""",
             (safe_query, limit),
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def count(self, type_name: str | None = None) -> int:
+    def count(self, type_name: str | None = None, include_deleted: bool = False) -> int:
         """Count objects, optionally filtered by type name."""
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
         if type_name:
             if not type_name.strip():
                 return 0
             row = self.conn.execute(
-                """SELECT COUNT(*) as cnt FROM objects o
+                f"""SELECT COUNT(*) as cnt FROM objects o
                    JOIN objects t ON o.type_id = t.id
-                   WHERE LOWER(t.title) = ?""",
+                   WHERE LOWER(t.title) = ? {deleted_filter}""",
                 (type_name.lower(),),
             ).fetchone()
         else:
-            row = self.conn.execute("SELECT COUNT(*) as cnt FROM objects").fetchone()
+            deleted_where = "" if include_deleted else "WHERE o.deleted_at IS NULL"
+            row = self.conn.execute(
+                f"SELECT COUNT(*) as cnt FROM objects o {deleted_where}"
+            ).fetchone()
         return row["cnt"]
 
-    def count_by_type(self) -> dict[str, int]:
+    def count_by_type(self, include_deleted: bool = False) -> dict[str, int]:
         """Count objects grouped by type name."""
+        deleted_filter = "" if include_deleted else "WHERE o.deleted_at IS NULL"
         rows = self.conn.execute(
-            """SELECT t.title as type_name, COUNT(*) as cnt
+            f"""SELECT t.title as type_name, COUNT(*) as cnt
                FROM objects o
                JOIN objects t ON o.type_id = t.id
+               {deleted_filter}
                GROUP BY t.title
                ORDER BY cnt DESC"""
         ).fetchall()
@@ -387,6 +523,42 @@ class ObjectRepo:
             (safe_prefix + "%",),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def verify_content_hashes(self) -> list[dict]:
+        """Verify content hashes for all objects. Returns list of mismatches."""
+        rows = self.conn.execute(
+            "SELECT id, title, summary, content, content_hash FROM objects"
+        ).fetchall()
+        mismatches = []
+        for row in rows:
+            expected = compute_content_hash(row["title"], row["summary"], row["content"])
+            actual = row["content_hash"]
+            if actual is not None and actual != expected:
+                mismatches.append({
+                    "id": row["id"],
+                    "title": row["title"],
+                    "expected_hash": expected,
+                    "actual_hash": actual,
+                })
+        return mismatches
+
+    def backfill_content_hashes(self) -> int:
+        """Compute and set content_hash for all objects that lack one.
+
+        Returns the number of objects updated.
+        """
+        rows = self.conn.execute(
+            "SELECT id, title, summary, content FROM objects WHERE content_hash IS NULL"
+        ).fetchall()
+        count = 0
+        for row in rows:
+            h = compute_content_hash(row["title"], row["summary"], row["content"])
+            self.conn.execute(
+                "UPDATE objects SET content_hash = ? WHERE id = ?",
+                (h, row["id"]),
+            )
+            count += 1
+        return count
 
 
 class TagRepo:
