@@ -102,7 +102,7 @@ docker compose exec exobrain exobrain status
 │   ├── infographics/       # Infographic generation frameworks
 │   └── ...
 ├── docs/
-│   └── adr/                # Architecture Decision Records (001-010)
+│   └── adr/                # Architecture Decision Records (001-016)
 ├── site/                   # Quarto site for publishing
 ├── docker-compose.yml
 └── .env.example

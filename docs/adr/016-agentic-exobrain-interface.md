@@ -208,6 +208,15 @@ System spaces: `primitives`, `primitives/type`, `primitives/space`, `primitives/
 
 Reference skill for AI agent interaction with ExoBrain. Use when user mentions exobrain, capture thought, search memory, tag object, link objects, attach file, list objects, project, sync, or graphrag. Replaces the hand-maintained `.claude/skills/exobrain.md`.
 
+**Workflow:**
+1. Invoke CLI commands via Docker: `docker compose exec exobrain exobrain <command> --json`
+2. Use `-T` flag when piping stdin: `echo "content" | docker compose exec -T exobrain exobrain capture --title "Title" --type note --json`
+3. Parse JSON output for structured consumption; use human output for display only
+4. For reading context: run `exobrain project`, then read projected markdown files from `$EXOBRAIN_DATA_DIR/projected/`
+5. For writing: use CLI commands (`capture`, `update`, `tag add`, `link create`, etc.)
+6. For linking provenance: `exobrain link create <new-id> <source-id> "derived-from" --json`
+7. Relationship vocabulary: `references`, `derived-from`, `supersedes`, `related-to`, `part-of`, `broader-than`, `responds-to`, `blocks`
+
 ## Agent Rules
 
 1. MUST invoke all ExoBrain CLI commands via Docker: `docker compose exec exobrain exobrain <command>`
@@ -221,3 +230,12 @@ Reference skill for AI agent interaction with ExoBrain. Use when user mentions e
 9. MUST handle CLI errors gracefully with user-visible remediation suggestions
 10. MUST link provenance when creating content in idea spaces (`derived-from`, `references`)
 11. MUST ensure `$EXOBRAIN_DATA_DIR` is the only directory required for full data recovery
+
+## References
+
+- ADR-002: `docs/adr/002-sqlite-core-memory-layer.md` (data model, schema, bootstrap types)
+- ADR-003: `docs/adr/003-exobrain-cli-architecture.md` (CLI as sole write interface, command groups, --json output)
+- ADR-004: `docs/adr/004-claude-code-first-ui.md` (Claude Code as first UI, hybrid pattern, style rules)
+- ADR-007: `docs/adr/007-projection-layer-architecture.md` (projection layer, hot tier scoring, bidirectional sync)
+- ADR-011: `docs/adr/011-primitive-semantics-and-knowledge-gardening.md` (primitive roles, relationship vocabulary, link context convention)
+- Current skill: `.claude/skills/exobrain.md` (to be replaced by generated `016-exobrain-interface/SKILL.md`)
