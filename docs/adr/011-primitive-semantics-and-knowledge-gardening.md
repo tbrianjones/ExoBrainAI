@@ -105,11 +105,10 @@ The current implementation in `engine/src/core/projection.py` (`sync_from_file`,
 
 ### 4. Space Descriptions
 
-Every space should have a meaningful concept object describing what belongs there. The `idea-readme` pattern from `/instantiate-idea` (`.claude/commands/instantiate-idea.md`, line 41) generalizes to all spaces:
+Every space object SHOULD have a meaningful summary and content body describing what belongs there, its purpose, conventions, and the current state of its contents. Space descriptions live on the space object directly (summary + content fields). Separate readme or concept objects for space descriptions are not used.
 
-- Each space SHOULD have a concept object tagged `space-readme` that describes the space's purpose, what belongs there, and any conventions.
-- Bootstrap spaces in `engine/src/core/bootstrap.py` have minimal descriptions (e.g., "Default space for user captures"). These should be enriched over time.
-- Empty or undescribed spaces are quality signals that knowledge gardening agents should surface.
+- Bootstrap spaces in `engine/src/core/bootstrap.py` have minimal descriptions that should be enriched over time as content accumulates and conventions solidify.
+- Empty or undescribed spaces (missing summary/content on the space object) are quality signals that knowledge gardening agents should surface.
 
 ### 5. Knowledge Gardening Model (Vision)
 
@@ -118,7 +117,7 @@ Every space should have a meaningful concept object describing what belongs ther
 The vision is a living system where AI agents continuously review, organize, and enrich information; making obvious decisions autonomously, asking humans when uncertain, and surfacing tasks for the human to engage with.
 
 **Quality signals agents should detect:**
-- Spaces with no `space-readme` concept object (undescribed spaces)
+- Spaces with empty or missing summary/content fields on the space object (undescribed spaces)
 - Objects in `inbox` that have accumulated enough context to be classified into a space
 - Tags that overlap semantically (consolidation candidates)
 - Sparse idea spaces that need fleshing out
@@ -142,6 +141,12 @@ Spaces will eventually serve as the unit of access control:
 - Some spaces may restrict AI access (sensitive content)
 
 The primitive semantics defined in this ADR accommodate this future by establishing spaces as the containment and access boundary. No schema changes are needed; permissions would be metadata on space objects.
+
+### 7. Link Context Convention
+
+Links carry two text fields: `relationship` and `context`. The `relationship` field is a short, taxonomy-like descriptor from `RELATIONSHIP_VOCABULARY` (e.g., `derived-from`, `references`, `spouse`). The `context` field is optional free-form text explaining the specific connection between objects (e.g., "This view was synthesized from the raw and extended transcripts during the Jan 2026 ideation session").
+
+The `context` field was added in migration 009 and is supported in `LinkRepo.create` and displayed in CLI `link list`, `get`, and the web UI.
 
 ## Consequences
 
@@ -187,7 +192,7 @@ The primitive semantics defined in this ADR accommodate this future by establish
 
 6. **MUST** treat space assignment as a human-confirmable decision when uncertain. For well-established patterns (e.g., `/ideate` creates under `ideas/`), agents MAY assign spaces autonomously. For novel content where the appropriate space is ambiguous, agents MUST propose a space and ask the human to confirm.
 
-7. **SHOULD** create a concept object tagged `space-readme` when creating a new space. This generalizes the pattern from `/instantiate-idea` (`.claude/commands/instantiate-idea.md`) where each idea space gets a concept object tagged `idea-readme`. All spaces benefit from a description of their purpose and contents.
+7. **SHOULD** write a rich summary and content body on the space object itself when creating a new space. The summary should describe the space's purpose and what belongs there. The content body should provide conventions, current state of contents, and any other relevant context. This replaces the earlier `space-readme` concept object pattern.
 
 8. **MUST NOT** impose a fixed top-level taxonomy. New spaces emerge from usage patterns. Do not create empty spaces preemptively; create them when content needs a home. The only exception is `inbox`, which always exists as the bootstrap default.
 

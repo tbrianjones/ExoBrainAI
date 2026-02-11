@@ -240,6 +240,10 @@ ALTER TABLE objects ADD COLUMN purged_at TEXT;
 CREATE INDEX IF NOT EXISTS idx_objects_purged_at ON objects(purged_at);
 """
 
+MIGRATION_009 = """
+ALTER TABLE links ADD COLUMN context TEXT;
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
@@ -249,4 +253,5 @@ MIGRATIONS: list[tuple[int, str, str]] = [
     (6, "Create View type and retype view-tagged documents", MIGRATION_006),
     (7, "Object versioning, soft delete, history triggers, backup log", MIGRATION_007),
     (8, "Tombstone support: purged_at column for link-preserving purge", MIGRATION_008),
+    (9, "Add context column to links table", MIGRATION_009),
 ]

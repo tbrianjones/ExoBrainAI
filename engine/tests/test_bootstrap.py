@@ -18,11 +18,11 @@ from src.core.db import check_integrity
 class TestBootstrapCreation:
     """Test that bootstrap creates the expected types and spaces."""
 
-    def test_creates_twelve_types(self, db_conn):
+    def test_creates_fourteen_types(self, db_conn):
         result = bootstrap(db_conn)
-        # 7 original + 4 (person, project, event, concept) + 1 (view)
-        assert result["types_created"] == 12
-        assert len(BOOTSTRAP_TYPES) == 12
+        # 7 original + 4 (person, project, event, concept) + 1 (view) + 2 (business, audience)
+        assert result["types_created"] == 14
+        assert len(BOOTSTRAP_TYPES) == 14
 
     def test_creates_six_spaces(self, db_conn):
         result = bootstrap(db_conn)
@@ -59,7 +59,7 @@ class TestBootstrapIdempotency:
     def test_idempotent_second_run_creates_nothing(self, db_conn):
         first = bootstrap(db_conn)
         second = bootstrap(db_conn)
-        assert first["types_created"] == 12
+        assert first["types_created"] == 14
         assert second["types_created"] == 0
         assert first["spaces_created"] == 6
         assert second["spaces_created"] == 0

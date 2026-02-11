@@ -25,6 +25,8 @@ BOOTSTRAP_IDS = {
     "event": "00000000-0000-7000-8000-00000000000a",
     "concept": "00000000-0000-7000-8000-00000000000b",
     "view": "00000000-0000-7000-8000-00000000000c",
+    "business": "00000000-0000-7000-8000-00000000000d",
+    "audience": "00000000-0000-7000-8000-00000000000e",
     # Spaces
     "primitives": "00000000-0000-7000-8000-000000000101",
     "primitives/type": "00000000-0000-7000-8000-000000000102",
@@ -48,6 +50,8 @@ BOOTSTRAP_TYPES = [
     ("event", "Event", "Time-bounded occurrence: meeting, conference, milestone, or deadline"),
     ("concept", "Concept", "Abstract idea, term definition, or framework; the conceptual backbone of an idea space"),
     ("view", "View", "Rendered content produced from source material in an idea space; poems, blog posts, briefs, infographics, and other publication-ready output"),
+    ("business", "Business", "Organization, company, or commercial entity referenced in the knowledge base"),
+    ("audience", "Audience", "Named group of people for audience-specific content targeting; contains member names and object IDs"),
 ]
 
 # Initial space definitions
@@ -190,3 +194,17 @@ def get_space_id(name: str) -> str:
         KeyError: If the space name is not a bootstrap space.
     """
     return BOOTSTRAP_IDS[name]
+
+
+def get_inverse_relationship(name: str) -> str:
+    """Get the inverse relationship name from RELATIONSHIP_VOCABULARY.
+
+    For example, 'derived-from' returns 'source-of'.
+    For unknown relationship names, returns the original name unchanged.
+    """
+    for rel, inverse, _desc in RELATIONSHIP_VOCABULARY:
+        if rel == name:
+            return inverse
+        if inverse == name:
+            return rel
+    return name

@@ -460,9 +460,11 @@ def get(
             typer.echo("Links:")
             for link in obj["links"]:
                 direction = link.get("direction", "?")
-                rel = link.get("relationship", "?")
+                rel = link.get("effective_relationship", link.get("relationship", "?"))
                 other = link.get("to_title") or link.get("from_title") or link.get("to_id") or link.get("from_id")
                 typer.echo(f"  [{direction}] {rel} -> {other}")
+                if link.get("context"):
+                    typer.echo(f"           {link['context']}")
         if obj["file"]:
             typer.echo(f"File:    {obj['file']['path']} ({obj['file'].get('mime_type', 'unknown')})")
 
@@ -907,6 +909,7 @@ def link_create(
     from_prefix: str = typer.Argument(..., help="Source object ID or prefix"),
     to_prefix: str = typer.Argument(..., help="Target object ID or prefix"),
     relationship: str = typer.Argument(..., help="Relationship description"),
+    context: Optional[str] = typer.Option(None, "--context", help="Context explaining why objects are linked"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Create a link between two objects."""
@@ -917,7 +920,7 @@ def link_create(
         to_id = _resolve_id(conn, to_prefix)
 
         link_repo = LinkRepo(conn)
-        link = link_repo.create(from_id, to_id, relationship)
+        link = link_repo.create(from_id, to_id, relationship, context=context)
         conn.commit()
 
     if json_output:
@@ -951,9 +954,11 @@ def link_list(
             typer.echo("Links:")
             for link in links:
                 direction = link.get("direction", "?")
-                rel = link.get("relationship", "?")
+                rel = link.get("effective_relationship", link.get("relationship", "?"))
                 other = link.get("to_title") or link.get("from_title") or "?"
                 typer.echo(f"  [{direction}] {rel} -> {other} (link #{link['id']})")
+                if link.get("context"):
+                    typer.echo(f"           {link['context']}")
 
 
 @link_app.command("remove")

@@ -147,7 +147,12 @@
                         {{ link.direction }}
                     </span>
                 </td>
-                <td class="py-2 text-gray-600">{{ link.relationship }}</td>
+                <td class="py-2 text-gray-600">
+                    {{ link.effective_relationship or link.relationship }}
+                    {% if link.context %}
+                    <p class="text-xs text-gray-400 mt-0.5">{{ link.context }}</p>
+                    {% endif %}
+                </td>
                 <td class="py-2">
                     {% if link.direction == 'outgoing' %}
                         {% if link.to_purged_at %}

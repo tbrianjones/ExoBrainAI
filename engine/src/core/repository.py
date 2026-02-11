@@ -685,6 +685,7 @@ class LinkRepo:
         relationship: str,
         source: str = "human",
         confidence: float = 1.0,
+        context: str | None = None,
     ) -> dict | None:
         """Create a link between two objects. Returns the link or None on conflict.
 
@@ -694,14 +695,15 @@ class LinkRepo:
             relationship: Relationship type (e.g., 'references', 'derived-from')
             source: Link provenance ('human', 'ai', 'import', 'system')
             confidence: Confidence score 0.0 to 1.0 (default 1.0)
+            context: Optional text explaining why the objects are linked
 
         Note: Does not commit; caller is responsible for transaction management.
         """
         try:
             cursor = self.conn.execute(
-                """INSERT INTO links (from_id, to_id, relationship, source, confidence)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (from_id, to_id, relationship, source, confidence),
+                """INSERT INTO links (from_id, to_id, relationship, source, confidence, context)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (from_id, to_id, relationship, source, confidence, context),
             )
             return self.get(cursor.lastrowid)
         except sqlite3.IntegrityError:
@@ -748,12 +750,16 @@ class LinkRepo:
 
     def list_all_for(self, object_id: str) -> list[dict]:
         """List all links involving an object (both directions)."""
+        from src.core.bootstrap import get_inverse_relationship
+
         outgoing = self.list_from(object_id)
         incoming = self.list_to(object_id)
         for link in outgoing:
             link["direction"] = "outgoing"
+            link["effective_relationship"] = link["relationship"]
         for link in incoming:
             link["direction"] = "incoming"
+            link["effective_relationship"] = get_inverse_relationship(link["relationship"])
         return outgoing + incoming
 
     def count(self) -> int:
