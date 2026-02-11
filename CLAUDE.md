@@ -195,6 +195,19 @@ docker compose exec exobrain exobrain project
 
 Commands `/generate-view`, `/generate-poem-view`, and `/generate-academic-infographic-view` handle this automatically.
 
+## Inline Content References
+
+Use `[[uuid|display text]]` syntax to embed references to other ExoBrain objects within markdown content. The web UI renders these as clickable links; projected files preserve the raw syntax.
+
+```markdown
+This builds on [[069abc12-3456-7890-abcd-ef1234567890|Dynamic Skill Architecture Plan]].
+```
+
+- **UUID** must be a full 36-character hyphenated UUID
+- **Display text** is mandatory; typically the object's title at time of writing
+- Use inline references for contextual mentions in prose; use hard links (`link create`) for structural relationships (`derived-from`, `references`)
+- See [ADR-014](docs/adr/014-inline-content-references.md) for the full specification
+
 ## Style Rules
 
 - **No dashes or double dashes.** Use semicolons or restructure.
@@ -226,6 +239,7 @@ ADRs document key architectural choices. Read these before making significant ch
 | [011](docs/adr/011-primitive-semantics-and-knowledge-gardening.md) | Primitive semantic roles (spaces, types, tags, links); emergent taxonomy; knowledge gardening vision |
 | [012](docs/adr/012-object-versioning-and-backup.md) | Object versioning (trigger-based history), soft/hard delete, automated SQLite backup |
 | [013](docs/adr/013-web-ui-write-operations.md) | Web UI write operations via CLI subprocess; tombstone purge; HTMX POST with HX-Request verification |
+| [014](docs/adr/014-inline-content-references.md) | Inline content references via `[[uuid\|display text]]` wiki-link syntax; post-sanitization rendering in web UI |
 
 ## Behavior
 

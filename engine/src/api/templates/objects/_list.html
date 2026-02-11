@@ -78,16 +78,3 @@
     </div>
 </div>
 {% endif %}
-
-<script>
-function exoSort(col) {
-    var sf = document.getElementById('sort-field');
-    var of = document.getElementById('order-field');
-    if (sf.value === col) {
-        of.value = of.value === 'asc' ? 'desc' : 'asc';
-    } else {
-        sf.value = col;
-        of.value = col === 'created' ? 'desc' : 'asc';
-    }
-}
-</script>

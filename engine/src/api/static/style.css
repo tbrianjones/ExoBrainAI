@@ -39,3 +39,8 @@
     border-radius: 0.25rem;
     font-size: 0.875em;
 }
+
+/* Space tree collapse/expand */
+.space-tree-children.collapsed {
+    display: none;
+}

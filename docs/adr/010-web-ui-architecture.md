@@ -40,16 +40,20 @@ Build a read-only explorer as server-rendered HTML within the existing FastAPI s
 6. **Path validation.** File explorer validates all paths stay within `$EXOBRAIN_DATA_DIR` to prevent path traversal.
 7. **Markdown rendered server-side.** Content is rendered to HTML on the server via the `markdown` Python library.
 
-### Pages (6 Views)
+### Pages (8 Views)
 
 | Page | Route | Purpose |
 |------|-------|---------|
 | Dashboard | `GET /ui/` | System overview: object counts, DB size, projection health |
 | Object Browser | `GET /ui/objects` | Filterable list with live search, pagination |
 | Object Detail | `GET /ui/objects/{id}` | Full metadata, rendered content, tags, links, files |
+| Tag Browser | `GET /ui/tags` | Tag cloud, enriched grid with type/space breakdown, search |
+| Space Explorer | `GET /ui/spaces` | Hierarchical tree with counts, types, activity dates |
 | File Explorer | `GET /ui/files` | Browse sharded file storage and projected directory |
 | Projection Explorer | `GET /ui/projection` | Tier stats, top scores, override lists |
 | CLI Console | `GET /ui/console` | Run whitelisted read-only CLI commands |
+
+> **Navigation note:** Tags and Spaces pages were added to surface two of the four core primitives (per ADR-011) as dedicated browsing surfaces. They follow all existing architectural constraints: read-only, HTMX fragments for dynamic content, repository layer for data access, `/ui/` and `/ui-api/` route prefixes.
 
 ### Future Write Path
 
@@ -111,4 +115,4 @@ When write operations are needed in the UI, they should go through CLI subproces
 - MUST keep all UI routes under `/ui/` prefix and HTMX endpoints under `/ui-api/`
 - MUST NOT add write operations to the UI without a new ADR
 - SHOULD use HTMX for dynamic updates instead of writing JavaScript
-- SHOULD reuse existing repository methods rather than creating new queries
+- SHOULD reuse existing repository methods; new repository methods for enriched data are acceptable when existing methods lack sufficient data

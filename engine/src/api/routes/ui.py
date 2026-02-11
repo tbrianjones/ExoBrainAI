@@ -59,12 +59,31 @@ def _strip_frontmatter(text: str) -> str:
     return text[end + 4:].lstrip("\n")
 
 
+_WIKILINK_RE = re.compile(
+    r"\[\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\|([^\]]+)\]\]"
+)
+
+
+def _convert_wikilinks(html_text: str) -> str:
+    """Convert [[uuid|display text]] wiki-links to clickable HTML links.
+
+    Runs after sanitization so relative URLs bypass the url_schemes check.
+    The UUID is validated by the regex; display text is HTML-escaped.
+    """
+    def _replace(m: re.Match) -> str:
+        uuid = m.group(1)
+        display = html.escape(m.group(2))
+        return f'<a href="/ui/objects/{uuid}">{display}</a>'
+    return _WIKILINK_RE.sub(_replace, html_text)
+
+
 def _render_markdown(content: str) -> str:
     """Render markdown to sanitized HTML, stripping any YAML frontmatter."""
     import markdown as md
     clean = _strip_frontmatter(content)
     raw_html = md.markdown(clean, extensions=["fenced_code", "tables"], tab_length=2)
-    return _sanitize_html(raw_html)
+    sanitized = _sanitize_html(raw_html)
+    return _convert_wikilinks(sanitized)
 
 
 def _generate_csrf_token() -> str:
@@ -103,6 +122,11 @@ async def objects_browse(request: Request):
     """Object browser page."""
     templates = _templates(request)
     ctx = _base_context(request, "objects")
+
+    # Read query params for clickthrough pre-selection
+    ctx["selected_tag"] = request.query_params.get("tag", "")
+    ctx["selected_space"] = request.query_params.get("space", "")
+    ctx["selected_type"] = request.query_params.get("type", "")
 
     db_path = get_db_path()
     if db_path.exists():
@@ -357,6 +381,104 @@ async def object_download_pdf(request: Request, obj_id: str):
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+
+@router.get("/tags", response_class=HTMLResponse)
+async def tags_browse(request: Request):
+    """Tag browser page with cloud and enriched grid."""
+    templates = _templates(request)
+    ctx = _base_context(request, "tags")
+
+    db_path = get_db_path()
+    if db_path.exists():
+        with db_session(db_path) as conn:
+            tag_repo = TagRepo(conn)
+            obj_repo = ObjectRepo(conn)
+
+            # Summary stats
+            distinct_tags = tag_repo.count()
+            total_assignments = tag_repo.total_assignments()
+            total_objects = obj_repo.count()
+            avg_tags = round(total_assignments / total_objects, 1) if total_objects > 0 else 0
+
+            ctx["distinct_tags"] = distinct_tags
+            ctx["total_assignments"] = total_assignments
+            ctx["avg_tags"] = avg_tags
+
+            # Tag cloud: top 60 tags by count
+            cloud_raw = tag_repo.list_all(limit=60)
+            if cloud_raw:
+                counts = [t["count"] for t in cloud_raw]
+                n = len(counts)
+                for i, tag in enumerate(cloud_raw):
+                    # Percentile rank (0-based index in sorted order)
+                    rank = sorted(counts).index(tag["count"])
+                    pct = rank / n if n > 1 else 1.0
+                    if pct < 0.2:
+                        tag["tier"] = 1
+                    elif pct < 0.4:
+                        tag["tier"] = 2
+                    elif pct < 0.6:
+                        tag["tier"] = 3
+                    elif pct < 0.8:
+                        tag["tier"] = 4
+                    else:
+                        tag["tier"] = 5
+                # Single tag = tier 5
+                if n == 1:
+                    cloud_raw[0]["tier"] = 5
+                # All same count = all tier 3
+                if len(set(counts)) == 1 and n > 1:
+                    for tag in cloud_raw:
+                        tag["tier"] = 3
+            ctx["cloud_tags"] = cloud_raw
+    else:
+        ctx["distinct_tags"] = 0
+        ctx["total_assignments"] = 0
+        ctx["avg_tags"] = 0
+        ctx["cloud_tags"] = []
+
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("tags/browse.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
+
+
+@router.get("/spaces", response_class=HTMLResponse)
+async def spaces_explorer(request: Request):
+    """Space explorer page with hierarchical tree."""
+    templates = _templates(request)
+    ctx = _base_context(request, "spaces")
+
+    db_path = get_db_path()
+    if db_path.exists():
+        with db_session(db_path) as conn:
+            obj_repo = ObjectRepo(conn)
+            space_stats = obj_repo.space_stats()
+
+            # Summary stats
+            ctx["total_spaces"] = len(space_stats)
+            top_level = [s for s in space_stats if "/" not in s["space_name"]]
+            ctx["top_level_count"] = len(top_level)
+            max_depth = 0
+            for s in space_stats:
+                depth = s["space_name"].count("/")
+                if depth > max_depth:
+                    max_depth = depth
+            ctx["max_depth"] = max_depth + 1  # depth 0 = level 1
+            ctx["total_objects_in_spaces"] = sum(s["direct_count"] for s in space_stats)
+    else:
+        ctx["total_spaces"] = 0
+        ctx["top_level_count"] = 0
+        ctx["max_depth"] = 0
+        ctx["total_objects_in_spaces"] = 0
+
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("spaces/explorer.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
 
 
 @router.get("/files", response_class=HTMLResponse)

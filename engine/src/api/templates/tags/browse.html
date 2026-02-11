@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Tags ; ExoBrain{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-900 mb-6">Tags</h2>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Distinct Tags</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ distinct_tags }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Tag Assignments</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ total_assignments }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Avg Tags/Object</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ avg_tags }}</div>
+    </div>
+</div>
+
+<!-- Tag cloud -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Tag Cloud</h3>
+    {% if cloud_tags %}
+    <div class="flex flex-wrap gap-2 items-baseline">
+        {% for tag in cloud_tags %}
+        <a href="/ui/objects?tag={{ tag.tag_text|urlencode }}"
+           class="inline-block rounded-full bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-700 cursor-pointer transition-colors
+                  {% if tag.tier == 1 %}text-xs px-2 py-0.5{% elif tag.tier == 2 %}text-sm px-2 py-0.5{% elif tag.tier == 3 %}text-sm px-2.5 py-1 font-medium{% elif tag.tier == 4 %}text-base px-3 py-1 font-medium{% elif tag.tier == 5 %}text-lg px-3 py-1.5 font-semibold{% endif %}">
+            {{ tag.tag_text }}
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-gray-500 text-sm">No tags yet.</div>
+    {% endif %}
+</div>
+
+<!-- Search -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <div class="flex-1 min-w-[200px]">
+        <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
+        <input type="text" name="q" placeholder="Filter tags..."
+               class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+               hx-get="/ui-api/tags"
+               hx-trigger="keyup changed delay:300ms"
+               hx-target="#tag-list"
+               hx-include="[name='sort'],[name='order']">
+    </div>
+</div>
+
+<!-- Hidden sort state -->
+<input type="hidden" name="sort" id="sort-field" value="count">
+<input type="hidden" name="order" id="order-field" value="desc">
+
+<!-- Tag list -->
+<div id="tag-list"
+     hx-get="/ui-api/tags"
+     hx-trigger="load"
+     hx-include="[name='sort'],[name='order']"
+     hx-swap="innerHTML">
+    <div class="text-gray-500 text-sm">Loading tags...</div>
+</div>
+
+<script>
+function exoSort(col) {
+    var sf = document.getElementById('sort-field');
+    var of = document.getElementById('order-field');
+    if (sf.value === col) {
+        of.value = of.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sf.value = col;
+        of.value = col === 'tag' ? 'asc' : 'desc';
+    }
+}
+</script>
+{% endblock %}

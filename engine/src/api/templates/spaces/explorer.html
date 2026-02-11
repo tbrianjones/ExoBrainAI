@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Spaces ; ExoBrain{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-900 mb-6">Spaces</h2>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Total Spaces</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ total_spaces }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Top-Level Spaces</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ top_level_count }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Deepest Nesting</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ max_depth }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Objects in Spaces</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ total_objects_in_spaces }}</div>
+    </div>
+</div>
+
+<!-- Toolbar -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 flex items-center justify-between gap-4 p-4 mb-6">
+    <input type="text" name="q" placeholder="Filter spaces..."
+           class="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+           hx-get="/ui-api/spaces/tree"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#space-tree">
+    <button id="collapse-toggle" onclick="toggleAllSpaces()"
+            class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-100">Expand All</button>
+</div>
+
+<!-- Space tree -->
+<div id="space-tree"
+     hx-get="/ui-api/spaces/tree"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    Loading spaces...
+</div>
+
+<script>
+function toggleSpace(btn) {
+    var item = btn.closest('.space-tree-item');
+    var children = item.querySelector(':scope > .space-tree-children');
+    if (children) {
+        var isCollapsed = children.style.display === 'none';
+        children.style.display = isCollapsed ? '' : 'none';
+        btn.textContent = isCollapsed ? '\u25bc' : '\u25b6';
+    }
+}
+function toggleAllSpaces() {
+    var btn = document.getElementById('collapse-toggle');
+    var allChildren = document.querySelectorAll('.space-tree-children');
+    var expanding = btn.textContent === 'Expand All';
+    allChildren.forEach(function(el) {
+        el.style.display = expanding ? '' : 'none';
+    });
+    document.querySelectorAll('.space-tree-toggle').forEach(function(t) {
+        t.textContent = expanding ? '\u25bc' : '\u25b6';
+    });
+    btn.textContent = expanding ? 'Collapse All' : 'Expand All';
+}
+</script>
+{% endblock %}

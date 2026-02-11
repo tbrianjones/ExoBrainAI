@@ -1,0 +1,117 @@
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">
+                    <button class="flex items-center gap-1 hover:text-gray-900 cursor-pointer"
+                            hx-get="/ui-api/tags?offset=0"
+                            hx-target="#tag-list"
+                            hx-include="[name='q'],[name='sort'],[name='order']"
+                            onclick="exoSort('tag')">
+                        Tag
+                        {% if sort == 'tag' %}
+                        <span class="text-blue-500">{{ '▲' if order == 'asc' else '▼' }}</span>
+                        {% endif %}
+                    </button>
+                </th>
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">
+                    <button class="flex items-center gap-1 hover:text-gray-900 cursor-pointer"
+                            hx-get="/ui-api/tags?offset=0"
+                            hx-target="#tag-list"
+                            hx-include="[name='q'],[name='sort'],[name='order']"
+                            onclick="exoSort('count')">
+                        Objects
+                        {% if sort == 'count' %}
+                        <span class="text-blue-500">{{ '▲' if order == 'asc' else '▼' }}</span>
+                        {% endif %}
+                    </button>
+                </th>
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Types</th>
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Spaces</th>
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">
+                    <button class="flex items-center gap-1 hover:text-gray-900 cursor-pointer"
+                            hx-get="/ui-api/tags?offset=0"
+                            hx-target="#tag-list"
+                            hx-include="[name='q'],[name='sort'],[name='order']"
+                            onclick="exoSort('first_used')">
+                        First Used
+                        {% if sort == 'first_used' %}
+                        <span class="text-blue-500">{{ '▲' if order == 'asc' else '▼' }}</span>
+                        {% endif %}
+                    </button>
+                </th>
+                <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">
+                    <button class="flex items-center gap-1 hover:text-gray-900 cursor-pointer"
+                            hx-get="/ui-api/tags?offset=0"
+                            hx-target="#tag-list"
+                            hx-include="[name='q'],[name='sort'],[name='order']"
+                            onclick="exoSort('last_used')">
+                        Last Used
+                        {% if sort == 'last_used' %}
+                        <span class="text-blue-500">{{ '▲' if order == 'asc' else '▼' }}</span>
+                        {% endif %}
+                    </button>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for tag in tags %}
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-2">
+                    <a href="/ui/objects?tag={{ tag.tag_text|urlencode }}" class="text-gray-900 font-medium hover:text-blue-600">{{ tag.tag_text }}</a>
+                </td>
+                <td class="px-4 py-2 font-mono text-gray-900">{{ tag.count }}</td>
+                <td class="px-4 py-2">
+                    {% for type_name in tag.types[:3] %}
+                    <span class="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-700 mr-1">{{ type_name }}</span>
+                    {% endfor %}
+                    {% if tag.types|length > 3 %}
+                    <span class="text-xs text-gray-500">+{{ tag.types|length - 3 }} more</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 text-sm text-gray-600">
+                    {% for space_name in tag.spaces[:3] %}
+                    <span class="mr-1">{{ space_name }}</span>
+                    {% endfor %}
+                    {% if tag.spaces|length > 3 %}
+                    <span class="text-xs text-gray-500">+{{ tag.spaces|length - 3 }} more</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ tag.first_used[:10] }}</td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ tag.last_used[:10] }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">No tags found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if tags %}
+<div class="flex items-center justify-between mt-4 text-sm">
+    <div class="text-gray-500">
+        Showing {{ offset + 1 }} to {{ offset + tags|length }}
+    </div>
+    <div class="flex gap-2">
+        {% if offset > 0 %}
+        <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                hx-get="/ui-api/tags?offset={{ [offset - limit, 0] | max }}&limit={{ limit }}&sort={{ sort }}&order={{ order }}"
+                hx-target="#tag-list"
+                hx-include="[name='q']">
+            Previous
+        </button>
+        {% endif %}
+        {% if tags|length == limit %}
+        <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                hx-get="/ui-api/tags?offset={{ offset + limit }}&limit={{ limit }}&sort={{ sort }}&order={{ order }}"
+                hx-target="#tag-list"
+                hx-include="[name='q']">
+            Next
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

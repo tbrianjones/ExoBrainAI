@@ -115,6 +115,180 @@ async def dashboard_stats(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Object summary stats (HTMX partial)
+# ---------------------------------------------------------------------------
+
+@router.get("/objects/stats", response_class=HTMLResponse)
+async def objects_stats(request: Request):
+    """Return object summary stats as an HTML fragment."""
+    templates = _templates(request)
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return HTMLResponse("")
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        tag_repo = TagRepo(conn)
+        link_repo = LinkRepo(conn)
+
+        ctx = {
+            "request": request,
+            "total_objects": obj_repo.count(),
+            "type_count": len(obj_repo.count_by_type()),
+            "tag_count": tag_repo.count(),
+            "link_count": link_repo.count(),
+        }
+    return templates.TemplateResponse("objects/_stats.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Tag listing (HTMX partial)
+# ---------------------------------------------------------------------------
+
+_VALID_TAG_SORT_COLS = {"tag", "count", "first_used", "last_used"}
+
+
+@router.get("/tags", response_class=HTMLResponse)
+async def list_tags(
+    request: Request,
+    q: str = "",
+    limit: int = 50,
+    offset: int = 0,
+    sort: str = "count",
+    order: str = "desc",
+):
+    """Return tag list as an HTML fragment."""
+    templates = _templates(request)
+
+    limit = min(max(1, limit), MAX_LIMIT)
+    offset = max(0, offset)
+
+    if sort not in _VALID_TAG_SORT_COLS:
+        sort = "count"
+    if order not in ("asc", "desc"):
+        order = "desc"
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return HTMLResponse("<div class='text-red-600'>Database not found.</div>")
+
+    with db_session(db_path) as conn:
+        tag_repo = TagRepo(conn)
+        tags, total = tag_repo.list_all_enriched(
+            search=q.strip(),
+            limit=limit,
+            offset=offset,
+            sort_by=sort,
+            sort_order=order,
+        )
+
+    ctx = {
+        "request": request,
+        "tags": tags,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "sort": sort,
+        "order": order,
+    }
+    return templates.TemplateResponse("tags/_list.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Space tree (HTMX partial)
+# ---------------------------------------------------------------------------
+
+def _build_space_tree(space_stats: list[dict], search: str = "") -> list[dict]:
+    """Build a nested tree from space stats for recursive template rendering.
+
+    Returns a list of root nodes. Each node has: name, leaf_name, depth,
+    direct_count, total_count, types, last_activity, children (list of child nodes).
+    """
+    # Filter by search if provided
+    if search:
+        search_lower = search.lower()
+        matching = {s["space_name"] for s in space_stats if search_lower in s["space_name"].lower()}
+        # Include ancestors of matching spaces
+        ancestors: set[str] = set()
+        for name in matching:
+            parts = name.split("/")
+            for i in range(1, len(parts)):
+                ancestors.add("/".join(parts[:i]))
+        included = matching | ancestors
+        space_stats = [s for s in space_stats if s["space_name"] in included]
+
+    if not space_stats:
+        return []
+
+    # Sort by name for consistent tree order
+    space_stats.sort(key=lambda s: s["space_name"])
+
+    # Build nested tree
+    nodes_by_name: dict[str, dict] = {}
+    root_nodes: list[dict] = []
+
+    for s in space_stats:
+        name = s["space_name"]
+        node = {
+            "name": name,
+            "leaf_name": name.rsplit("/", 1)[-1] if "/" in name else name,
+            "depth": name.count("/"),
+            "direct_count": s["direct_count"],
+            "total_count": s["direct_count"],  # computed below
+            "types": s.get("types", []),
+            "last_activity": s.get("last_activity"),
+            "children": [],
+        }
+        nodes_by_name[name] = node
+
+        # Find parent
+        if "/" in name:
+            parent_name = name.rsplit("/", 1)[0]
+            if parent_name in nodes_by_name:
+                nodes_by_name[parent_name]["children"].append(node)
+            else:
+                root_nodes.append(node)
+        else:
+            root_nodes.append(node)
+
+    # Compute total_count recursively (direct + all descendants)
+    def _compute_total(node: dict) -> int:
+        total = node["direct_count"]
+        for child in node["children"]:
+            total += _compute_total(child)
+        node["total_count"] = total
+        return total
+
+    for root in root_nodes:
+        _compute_total(root)
+
+    return root_nodes
+
+
+@router.get("/spaces/tree", response_class=HTMLResponse)
+async def space_tree(request: Request, q: str = ""):
+    """Return space tree as an HTML fragment."""
+    templates = _templates(request)
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return HTMLResponse("<div class='text-red-600'>Database not found.</div>")
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        stats = obj_repo.space_stats()
+
+    tree = _build_space_tree(stats, search=q.strip())
+
+    ctx = {
+        "request": request,
+        "tree": tree,
+    }
+    return templates.TemplateResponse("spaces/_tree.html", ctx)
+
+
+# ---------------------------------------------------------------------------
 # Object listing (HTMX partial)
 # ---------------------------------------------------------------------------
 

@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.core.bootstrap import BOOTSTRAP_IDS
-from src.core.repository import ObjectRepo
+from src.core.repository import ObjectRepo, TagRepo
 
 
 @pytest.fixture()
@@ -358,6 +358,79 @@ class TestCommandWhitelist:
 # HTML sanitization
 # ---------------------------------------------------------------------------
 
+class TestWikiLinks:
+    """Test [[uuid|display text]] wiki-link rendering."""
+
+    def test_basic_wikilink(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown("See [[069abc12-3456-7890-abcd-ef1234567890|My Document]] for details.")
+        assert '<a href="/ui/objects/069abc12-3456-7890-abcd-ef1234567890">My Document</a>' in result
+        assert "[[" not in result
+
+    def test_multiple_wikilinks(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown(
+            "Link to [[069abc12-3456-7890-abcd-ef1234567890|First]] and "
+            "[[069abc12-3456-7890-abcd-ef1234567891|Second]]."
+        )
+        assert '<a href="/ui/objects/069abc12-3456-7890-abcd-ef1234567890">First</a>' in result
+        assert '<a href="/ui/objects/069abc12-3456-7890-abcd-ef1234567891">Second</a>' in result
+
+    def test_wikilink_in_paragraph(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown(
+            "This builds on [[069abc12-3456-7890-abcd-ef1234567890|Dynamic Skill Architecture]], "
+            "which established the pattern."
+        )
+        assert "<p>" in result
+        assert '<a href="/ui/objects/069abc12-3456-7890-abcd-ef1234567890">Dynamic Skill Architecture</a>' in result
+
+    def test_invalid_uuid_left_as_literal(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown("See [[not-a-valid-uuid|Broken Link]] here.")
+        assert "[[not-a-valid-uuid|Broken Link]]" in result
+        assert "<a " not in result or 'not-a-valid-uuid' not in result
+
+    def test_display_text_html_escaped(self):
+        from src.api.routes.ui import _convert_wikilinks
+        # Test the conversion function directly to verify HTML escaping
+        result = _convert_wikilinks('[[069abc12-3456-7890-abcd-ef1234567890|Title with <b>bold</b>]]')
+        assert "&lt;b&gt;" in result
+        assert "<b>" not in result
+
+    def test_script_in_display_text_safe(self):
+        from src.api.routes.ui import _render_markdown
+        # nh3 strips <script> before wiki-link processing, so the link won't render;
+        # the important thing is that no <script> tag appears in output
+        result = _render_markdown('See [[069abc12-3456-7890-abcd-ef1234567890|Title with <script>]].')
+        assert "<script>" not in result
+
+    def test_wikilink_with_special_display_text(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown('See [[069abc12-3456-7890-abcd-ef1234567890|Title & "Quotes"]].')
+        assert "&amp;" in result
+        assert "Title" in result
+
+    def test_wikilink_coexists_with_regular_links(self):
+        from src.api.routes.ui import _render_markdown
+        result = _render_markdown(
+            "See [[069abc12-3456-7890-abcd-ef1234567890|Internal]] and "
+            "[external](https://example.com)."
+        )
+        assert '<a href="/ui/objects/069abc12-3456-7890-abcd-ef1234567890">Internal</a>' in result
+        assert 'href="https://example.com"' in result
+
+    def test_convert_wikilinks_directly(self):
+        from src.api.routes.ui import _convert_wikilinks
+        result = _convert_wikilinks("text [[069abc12-3456-7890-abcd-ef1234567890|Link]] more")
+        assert '<a href="/ui/objects/069abc12-3456-7890-abcd-ef1234567890">Link</a>' in result
+
+    def test_no_wikilinks_unchanged(self):
+        from src.api.routes.ui import _convert_wikilinks
+        text = "<p>No wiki links here.</p>"
+        assert _convert_wikilinks(text) == text
+
+
 class TestHTMLSanitization:
     """Test that markdown rendering strips dangerous HTML."""
 
@@ -634,3 +707,253 @@ class TestFilePreviewSizeLimit:
         assert resp.status_code == 200
         assert "too large" in resp.text.lower()
         assert "10 MB" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Tags page
+# ---------------------------------------------------------------------------
+
+class TestTagsPage:
+
+    def test_tags_page_renders(self, client):
+        resp = client.get("/ui/tags")
+        assert resp.status_code == 200
+        assert "Tags" in resp.text
+
+    def test_tags_page_shows_cloud(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui/tags")
+        assert resp.status_code == 200
+        assert "Tag Cloud" in resp.text
+        assert "quantum" in resp.text
+        assert "computing" in resp.text
+
+    def test_tags_page_shows_summary_cards(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui/tags")
+        assert resp.status_code == 200
+        assert "Distinct Tags" in resp.text
+        assert "Tag Assignments" in resp.text
+        assert "Avg Tags/Object" in resp.text
+
+
+class TestTagsListEndpoint:
+
+    def test_tag_list_returns_html(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/tags")
+        assert resp.status_code == 200
+        assert "quantum" in resp.text
+        assert "computing" in resp.text
+
+    def test_tag_list_shows_counts(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/tags")
+        assert resp.status_code == 200
+        # "computing" appears on 2 objects
+        assert "2" in resp.text
+
+    def test_tag_list_search(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/tags?q=quant")
+        assert resp.status_code == 200
+        assert "quantum" in resp.text
+        assert "machine-learning" not in resp.text
+
+    def test_tag_list_sort_by_tag(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/tags?sort=tag&order=asc")
+        assert resp.status_code == 200
+        assert "computing" in resp.text
+
+    def test_tag_list_empty_search(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/tags?q=zzzznonexistent")
+        assert resp.status_code == 200
+        assert "No tags found" in resp.text
+
+    def test_tag_list_empty_db(self, client):
+        resp = client.get("/ui-api/tags")
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Spaces page
+# ---------------------------------------------------------------------------
+
+class TestSpacesPage:
+
+    def test_spaces_page_renders(self, client):
+        resp = client.get("/ui/spaces")
+        assert resp.status_code == 200
+        assert "Spaces" in resp.text
+
+    def test_spaces_page_shows_summary_cards(self, client):
+        resp = client.get("/ui/spaces")
+        assert resp.status_code == 200
+        assert "Total Spaces" in resp.text
+        assert "Top-Level Spaces" in resp.text
+
+
+class TestSpacesTreeEndpoint:
+
+    def test_space_tree_returns_html(self, client):
+        resp = client.get("/ui-api/spaces/tree")
+        assert resp.status_code == 200
+        # Bootstrap spaces should appear
+        assert "primitives" in resp.text or "inbox" in resp.text
+
+    def test_space_tree_shows_counts(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/spaces/tree")
+        assert resp.status_code == 200
+        assert "objects" in resp.text
+
+    def test_space_tree_search(self, client):
+        resp = client.get("/ui-api/spaces/tree?q=inbox")
+        assert resp.status_code == 200
+        assert "inbox" in resp.text
+
+    def test_space_tree_search_no_results(self, client):
+        resp = client.get("/ui-api/spaces/tree?q=zzzznonexistent")
+        assert resp.status_code == 200
+        assert "No spaces found" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Objects stats endpoint
+# ---------------------------------------------------------------------------
+
+class TestObjectsStats:
+
+    def test_objects_stats_returns_html(self, client):
+        resp = client.get("/ui-api/objects/stats")
+        assert resp.status_code == 200
+        assert "Total Objects" in resp.text
+
+    def test_objects_stats_shows_counts(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/objects/stats")
+        assert resp.status_code == 200
+        assert "Types" in resp.text
+        assert "Tags" in resp.text
+        assert "Links" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Objects page clickthrough
+# ---------------------------------------------------------------------------
+
+class TestObjectsClickthrough:
+
+    def test_tag_preselection(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui/objects?tag=quantum")
+        assert resp.status_code == 200
+        assert 'selected' in resp.text
+
+    def test_space_preselection(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui/objects?space=primitives")
+        assert resp.status_code == 200
+        assert 'selected' in resp.text
+
+    def test_type_preselection(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui/objects?type=Document")
+        assert resp.status_code == 200
+        assert 'selected' in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Repository: TagRepo.list_all_enriched
+# ---------------------------------------------------------------------------
+
+class TestTagRepoListAllEnriched:
+
+    def test_returns_tags_with_enrichment(self, sample_objects):
+        conn = sample_objects["conn"]
+        tag_repo = TagRepo(conn)
+        tags, total = tag_repo.list_all_enriched()
+        assert total == 4
+        assert len(tags) <= 50
+        # Check enrichment fields
+        computing_tag = next(t for t in tags if t["tag_text"] == "computing")
+        assert computing_tag["count"] == 2
+        assert "Document" in computing_tag["types"]
+        assert "primitives" in computing_tag["spaces"]
+
+    def test_search_filter(self, sample_objects):
+        conn = sample_objects["conn"]
+        tag_repo = TagRepo(conn)
+        tags, total = tag_repo.list_all_enriched(search="quant")
+        assert total == 1
+        assert tags[0]["tag_text"] == "quantum"
+
+    def test_sort_by_tag_asc(self, sample_objects):
+        conn = sample_objects["conn"]
+        tag_repo = TagRepo(conn)
+        tags, total = tag_repo.list_all_enriched(sort_by="tag", sort_order="asc")
+        tag_names = [t["tag_text"] for t in tags]
+        assert tag_names == sorted(tag_names)
+
+    def test_pagination(self, sample_objects):
+        conn = sample_objects["conn"]
+        tag_repo = TagRepo(conn)
+        tags, total = tag_repo.list_all_enriched(limit=2, offset=0)
+        assert len(tags) == 2
+        assert total == 4
+
+    def test_total_assignments(self, sample_objects):
+        conn = sample_objects["conn"]
+        tag_repo = TagRepo(conn)
+        assert tag_repo.total_assignments() == 5
+
+
+# ---------------------------------------------------------------------------
+# Repository: ObjectRepo.space_stats
+# ---------------------------------------------------------------------------
+
+class TestObjectRepoSpaceStats:
+
+    def test_returns_space_stats(self, sample_objects):
+        conn = sample_objects["conn"]
+        obj_repo = ObjectRepo(conn)
+        stats = obj_repo.space_stats()
+        assert len(stats) > 0
+        # Each stat should have required fields
+        for s in stats:
+            assert "space_id" in s
+            assert "space_name" in s
+            assert "direct_count" in s
+            assert "types" in s
+
+    def test_primitives_space_has_objects(self, sample_objects):
+        conn = sample_objects["conn"]
+        obj_repo = ObjectRepo(conn)
+        stats = obj_repo.space_stats()
+        primitives = next(s for s in stats if s["space_name"] == "primitives")
+        assert primitives["direct_count"] == 3  # obj_a, obj_b, obj_c
+        # Types should include Document and Note
+        type_names = [t[0] for t in primitives["types"]]
+        assert "Document" in type_names
+        assert "Note" in type_names
+
+
+# ---------------------------------------------------------------------------
+# Navigation
+# ---------------------------------------------------------------------------
+
+class TestNavigation:
+
+    def test_sidebar_has_tags_link(self, client):
+        resp = client.get("/ui/")
+        assert resp.status_code == 200
+        assert '/ui/tags' in resp.text
+        assert 'Tags' in resp.text
+
+    def test_sidebar_has_spaces_link(self, client):
+        resp = client.get("/ui/")
+        assert resp.status_code == 200
+        assert '/ui/spaces' in resp.text
+        assert 'Spaces' in resp.text

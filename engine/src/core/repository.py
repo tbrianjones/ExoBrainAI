@@ -604,6 +604,58 @@ class ObjectRepo:
         ).fetchone()
         return row["cnt"]
 
+    def space_stats(self) -> list[dict]:
+        """Return stats for all spaces: direct count, last activity, type breakdown.
+
+        Each dict has: space_id, space_name, direct_count, last_activity, types.
+        Types is a list of (type_name, count) tuples sorted by count desc.
+        """
+        from src.core.bootstrap import BOOTSTRAP_IDS
+
+        space_type_id = BOOTSTRAP_IDS["space"]
+
+        # Query 1: Direct counts and last activity per space
+        rows = self.conn.execute(
+            """SELECT s.id as space_id, s.title as space_name,
+                      COUNT(o.id) as direct_count,
+                      MAX(o.updated_at) as last_activity
+               FROM objects s
+               LEFT JOIN objects o ON o.space_id = s.id
+                   AND o.type_id != :space_type_id
+                   AND o.deleted_at IS NULL AND o.purged_at IS NULL
+               WHERE s.type_id = :space_type_id
+                   AND s.deleted_at IS NULL AND s.purged_at IS NULL
+               GROUP BY s.id, s.title
+               ORDER BY s.title""",
+            {"space_type_id": space_type_id},
+        ).fetchall()
+        spaces = [dict(r) for r in rows]
+
+        # Query 2: Type breakdown per space
+        type_rows = self.conn.execute(
+            """SELECT o.space_id, t.title as type_name, COUNT(*) as cnt
+               FROM objects o
+               JOIN objects t ON o.type_id = t.id
+               WHERE o.deleted_at IS NULL AND o.purged_at IS NULL
+                   AND o.type_id != :space_type_id
+               GROUP BY o.space_id, t.title""",
+            {"space_type_id": space_type_id},
+        ).fetchall()
+
+        # Build lookup: {space_id: [(type_name, count), ...]}
+        types_by_space: dict[str, list[tuple[str, int]]] = {}
+        for row in type_rows:
+            types_by_space.setdefault(row["space_id"], []).append(
+                (row["type_name"], row["cnt"])
+            )
+
+        # Merge type breakdown into space dicts
+        for space in spaces:
+            type_list = types_by_space.get(space["space_id"], [])
+            space["types"] = sorted(type_list, key=lambda x: x[1], reverse=True)
+
+        return spaces
+
 
 class TagRepo:
     """Operations for object tags."""
@@ -670,6 +722,100 @@ class TagRepo:
             "SELECT COUNT(DISTINCT tag_text) as cnt FROM object_tags"
         ).fetchone()
         return row["cnt"]
+
+    def total_assignments(self) -> int:
+        """Count total tag assignments (sum of all tag usages)."""
+        row = self.conn.execute(
+            """SELECT COUNT(*) as cnt FROM object_tags ot
+               JOIN objects o ON ot.object_id = o.id
+               WHERE o.deleted_at IS NULL AND o.purged_at IS NULL"""
+        ).fetchone()
+        return row["cnt"]
+
+    def list_all_enriched(
+        self,
+        search: str = "",
+        limit: int = 50,
+        offset: int = 0,
+        sort_by: str = "count",
+        sort_order: str = "desc",
+    ) -> tuple[list[dict], int]:
+        """List tags with enriched metadata (types, spaces per tag).
+
+        Returns (tags, total_count) where tags is a list of dicts with keys:
+        tag_text, count, first_used, last_used, types, spaces.
+        """
+        # Query 1: Core tag data (paginated, sorted, filtered)
+        conditions = ["o.deleted_at IS NULL", "o.purged_at IS NULL"]
+        params: list = []
+
+        if search:
+            safe_search = _escape_like(search)
+            conditions.append("ot.tag_text LIKE ? ESCAPE '\\'")
+            params.append(f"%{safe_search}%")
+
+        where_clause = " AND ".join(conditions)
+
+        # Get total count for pagination
+        count_sql = f"""SELECT COUNT(DISTINCT ot.tag_text) as cnt
+            FROM object_tags ot
+            JOIN objects o ON ot.object_id = o.id
+            WHERE {where_clause}"""
+        total = self.conn.execute(count_sql, params).fetchone()["cnt"]
+
+        # Sort mapping
+        sort_columns = {
+            "tag": "ot.tag_text",
+            "count": "count",
+            "first_used": "first_used",
+            "last_used": "last_used",
+        }
+        sort_col = sort_columns.get(sort_by, "count")
+        order = "ASC" if sort_order.lower() == "asc" else "DESC"
+
+        data_sql = f"""SELECT ot.tag_text, COUNT(*) as count,
+                MIN(ot.created_at) as first_used, MAX(ot.created_at) as last_used
+            FROM object_tags ot
+            JOIN objects o ON ot.object_id = o.id
+            WHERE {where_clause}
+            GROUP BY ot.tag_text
+            ORDER BY {sort_col} {order}
+            LIMIT ? OFFSET ?"""
+        data_params = params + [limit, offset]
+        rows = self.conn.execute(data_sql, data_params).fetchall()
+        tags = [dict(r) for r in rows]
+
+        if not tags:
+            return tags, total
+
+        # Query 2: Batch enrichment (types and spaces per tag)
+        tag_texts = [t["tag_text"] for t in tags]
+        placeholders = ",".join("?" for _ in tag_texts)
+        enrich_sql = f"""SELECT ot.tag_text, t.title as type_name, s.title as space_name
+            FROM object_tags ot
+            JOIN objects o ON ot.object_id = o.id
+            JOIN objects t ON o.type_id = t.id
+            JOIN objects s ON o.space_id = s.id
+            WHERE ot.tag_text IN ({placeholders})
+              AND o.deleted_at IS NULL AND o.purged_at IS NULL"""
+        enrich_rows = self.conn.execute(enrich_sql, tag_texts).fetchall()
+
+        # Aggregate into {tag_text: {types: set(), spaces: set()}}
+        enrichment: dict[str, dict[str, set]] = {}
+        for row in enrich_rows:
+            tag = row["tag_text"]
+            if tag not in enrichment:
+                enrichment[tag] = {"types": set(), "spaces": set()}
+            enrichment[tag]["types"].add(row["type_name"])
+            enrichment[tag]["spaces"].add(row["space_name"])
+
+        # Merge enrichment into tag dicts
+        for tag in tags:
+            info = enrichment.get(tag["tag_text"], {"types": set(), "spaces": set()})
+            tag["types"] = sorted(info["types"])
+            tag["spaces"] = sorted(info["spaces"])
+
+        return tags, total
 
 
 class LinkRepo:
