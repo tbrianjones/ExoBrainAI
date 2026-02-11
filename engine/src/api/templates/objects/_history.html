@@ -1,0 +1,32 @@
+<div class="space-y-2">
+    <!-- Current version (not expandable) -->
+    <div class="flex items-center gap-3 px-3 py-2 bg-blue-50 rounded border border-blue-200 text-sm">
+        <span class="font-medium text-blue-700">v{{ obj.version }}</span>
+        <span class="text-blue-600 text-xs">Current</span>
+    </div>
+
+    {% if versions %}
+    {% for v in versions | reverse %}
+    <div class="border border-gray-200 rounded">
+        <div class="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer"
+             hx-get="/ui-api/objects/{{ obj.id }}/diff/{{ v.version }}"
+             hx-target="#diff-{{ v.version }}"
+             hx-swap="innerHTML">
+            <div class="flex items-center gap-3 text-sm">
+                <span class="font-medium text-gray-700">v{{ v.version }}</span>
+                <span class="text-gray-400 text-xs font-mono">{{ v.created_at }}</span>
+                {% if v.changed_by %}
+                <span class="text-gray-400 text-xs">by {{ v.changed_by }}</span>
+                {% endif %}
+            </div>
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </div>
+        <div id="diff-{{ v.version }}" class="border-t border-gray-100"></div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="text-gray-400 text-sm">No previous versions</p>
+    {% endif %}
+</div>

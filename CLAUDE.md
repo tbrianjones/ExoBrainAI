@@ -225,6 +225,7 @@ ADRs document key architectural choices. Read these before making significant ch
 | [010](docs/adr/010-web-ui-architecture.md) | Read-only web UI with Jinja2 + HTMX + Tailwind; integrated into FastAPI on `/ui/` |
 | [011](docs/adr/011-primitive-semantics-and-knowledge-gardening.md) | Primitive semantic roles (spaces, types, tags, links); emergent taxonomy; knowledge gardening vision |
 | [012](docs/adr/012-object-versioning-and-backup.md) | Object versioning (trigger-based history), soft/hard delete, automated SQLite backup |
+| [013](docs/adr/013-web-ui-write-operations.md) | Web UI write operations via CLI subprocess; tombstone purge; HTMX POST with HX-Request verification |
 
 ## Behavior
 

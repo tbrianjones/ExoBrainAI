@@ -4,6 +4,17 @@
 <!-- Back link -->
 <a href="/ui/objects" class="text-sm text-blue-600 hover:text-blue-800 mb-4 inline-block ">&larr; Back to objects</a>
 
+{% if is_deleted %}
+<!-- Soft-deleted notice -->
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 flex items-center gap-3">
+    <span class="text-amber-600 text-lg">&#9888;</span>
+    <div>
+        <p class="text-sm font-medium text-amber-800">This object has been deleted.</p>
+        <p class="text-xs text-amber-600">Deleted at {{ obj.deleted_at }}. Use the CLI to restore: <code class="bg-amber-100 px-1 rounded">exobrain undelete {{ obj.id }}</code></p>
+    </div>
+</div>
+{% endif %}
+
 <!-- Header -->
 <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
     <div class="flex items-start justify-between">
@@ -38,6 +49,23 @@
                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     Download PDF
                 </a>
+                <div class="border-t border-gray-200 my-1"></div>
+                <button hx-post="/ui-api/objects/{{ obj.id }}/delete"
+                        hx-target="#action-result"
+                        hx-confirm="Mark as deleted? This can be undone."
+                        class="w-full text-left px-4 py-2 text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2"
+                        onclick="closeDropdown();">
+                    <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    Mark Deleted
+                </button>
+                <button hx-post="/ui-api/objects/{{ obj.id }}/purge"
+                        hx-target="#action-result"
+                        hx-confirm="Permanently purge this object? Content will be destroyed and cannot be recovered."
+                        class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center gap-2"
+                        onclick="closeDropdown();">
+                    <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                    Purge Permanently
+                </button>
             </div>
         </div>
     </div>
@@ -46,8 +74,11 @@
         <div>Created: {{ obj.created_at }}</div>
         <div>Type ID: {{ obj.type_id }}</div>
         <div>Updated: {{ obj.updated_at }}</div>
+        <div>Version: {{ obj.version }}</div>
     </div>
 </div>
+
+<div id="action-result" class="mb-4"></div>
 
 <!-- Summary -->
 {% if summary_html %}
@@ -83,6 +114,18 @@
 </div>
 {% endif %}
 
+<!-- Version History -->
+{% if obj.version and obj.version > 1 %}
+<div class="mb-6">
+    <h3 class="text-xs font-medium uppercase tracking-wider text-gray-400 mb-2">Version History</h3>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div hx-get="/ui-api/objects/{{ obj.id }}/history" hx-trigger="load" hx-swap="innerHTML">
+            <span class="text-gray-400 text-sm">Loading history...</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Links -->
 {% if links %}
 <div class="mb-6">
@@ -107,9 +150,17 @@
                 <td class="py-2 text-gray-600">{{ link.relationship }}</td>
                 <td class="py-2">
                     {% if link.direction == 'outgoing' %}
-                    <a href="/ui/objects/{{ link.to_id }}" class="text-blue-600 hover:text-blue-800">{{ link.to_title }}</a>
+                        {% if link.to_purged_at %}
+                        <span class="text-gray-400 italic">[Purged]</span>
+                        {% else %}
+                        <a href="/ui/objects/{{ link.to_id }}" class="text-blue-600 hover:text-blue-800">{{ link.to_title }}</a>
+                        {% endif %}
                     {% else %}
-                    <a href="/ui/objects/{{ link.from_id }}" class="text-blue-600 hover:text-blue-800">{{ link.from_title }}</a>
+                        {% if link.from_purged_at %}
+                        <span class="text-gray-400 italic">[Purged]</span>
+                        {% else %}
+                        <a href="/ui/objects/{{ link.from_id }}" class="text-blue-600 hover:text-blue-800">{{ link.from_title }}</a>
+                        {% endif %}
                     {% endif %}
                 </td>
             </tr>

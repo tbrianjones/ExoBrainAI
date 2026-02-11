@@ -231,6 +231,13 @@ CREATE TABLE IF NOT EXISTS backup_log (
 );
 """
 
+MIGRATION_008 = """
+-- Tombstone support: purged objects keep their row and links but lose content.
+-- purged_at is NULL for active objects, ISO 8601 timestamp for tombstoned objects.
+ALTER TABLE objects ADD COLUMN purged_at TEXT;
+CREATE INDEX IF NOT EXISTS idx_objects_purged_at ON objects(purged_at);
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "Initial schema: objects, tags, links, files, FTS5", MIGRATION_001),
     (2, "Auto-update updated_at trigger", MIGRATION_002),
@@ -239,4 +246,5 @@ MIGRATIONS: list[tuple[int, str, str]] = [
     (5, "Move space paths from summary to title", MIGRATION_005),
     (6, "Create View type and retype view-tagged documents", MIGRATION_006),
     (7, "Object versioning, soft delete, history triggers, backup log", MIGRATION_007),
+    (8, "Tombstone support: purged_at column for link-preserving purge", MIGRATION_008),
 ]

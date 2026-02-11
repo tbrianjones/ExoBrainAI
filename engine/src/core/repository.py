@@ -79,12 +79,12 @@ class ObjectRepo:
         return self.get(obj_id)
 
     def get(self, obj_id: str, include_deleted: bool = False) -> dict | None:
-        """Get an object by ID. Returns None if not found or soft-deleted.
+        """Get an object by ID. Returns None if not found, soft-deleted, or purged.
 
         Args:
-            include_deleted: If True, return soft-deleted objects too.
+            include_deleted: If True, return soft-deleted and purged objects too.
         """
-        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL AND o.purged_at IS NULL"
         row = self.conn.execute(
             f"""SELECT o.*,
                       t.title as type_name,
@@ -107,7 +107,7 @@ class ObjectRepo:
         if len(prefix) < 8:
             return None
         safe_prefix = _escape_like(prefix)
-        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL AND o.purged_at IS NULL"
         rows = self.conn.execute(
             f"""SELECT o.*,
                       t.title as type_name,
@@ -124,7 +124,7 @@ class ObjectRepo:
 
     def resolve_id(self, id_or_prefix: str, include_deleted: bool = False) -> str | None:
         """Resolve a full ID or prefix to a full ID. Returns None if unresolvable."""
-        deleted_filter = "" if include_deleted else "AND deleted_at IS NULL"
+        deleted_filter = "" if include_deleted else "AND deleted_at IS NULL AND purged_at IS NULL"
         # Try exact match first
         row = self.conn.execute(
             f"SELECT id FROM objects WHERE id = ? {deleted_filter}", (id_or_prefix,)
@@ -169,6 +169,7 @@ class ObjectRepo:
 
         if not include_deleted:
             conditions.append("o.deleted_at IS NULL")
+            conditions.append("o.purged_at IS NULL")
 
         if type_name:
             # Type filter takes precedence: when explicitly filtering by type,
@@ -309,37 +310,61 @@ class ObjectRepo:
         return cursor.rowcount > 0
 
     def purge(self, obj_id: str) -> bool:
-        """Permanently delete an object, its history, tags, links, and file.
+        """Tombstone an object: clear content but preserve the row and links.
 
-        This is a hard delete with CASCADE. Also removes all history entries.
-        Cleans up any attached file on disk.
+        Removes history entries, tags, and file attachment. Sets title to
+        '[Purged]', clears summary/content/content_hash, sets purged_at
+        and deleted_at timestamps. Links remain intact so other objects'
+        link graphs are not broken.
 
         Note: Does not commit; caller is responsible for transaction management.
         Returns True if purged.
         """
-        # Read file path before deleting (CASCADE will remove the files row)
+        # Check object exists
+        row = self.conn.execute("SELECT id FROM objects WHERE id = ?", (obj_id,)).fetchone()
+        if not row:
+            return False
+
+        # Clean up disk file before removing file record
         file_repo = FileRepo(self.conn)
         file_info = file_repo.get(obj_id)
-
-        # Remove history (no FK, so must be explicit)
-        self.conn.execute("DELETE FROM object_history WHERE object_id = ?", (obj_id,))
-
-        # Hard delete the object (CASCADE removes tags, links, files rows)
-        cursor = self.conn.execute("DELETE FROM objects WHERE id = ?", (obj_id,))
-
-        # Clean up disk file after DB delete (with path traversal guard)
         if file_info:
             full_path = FileRepo._validate_path(settings.files_dir / file_info["path"])
             if full_path.exists():
                 full_path.unlink()
-            # Clean up empty shard directories
             for parent in [full_path.parent, full_path.parent.parent]:
                 try:
                     parent.rmdir()
                 except OSError:
                     break
 
-        return cursor.rowcount > 0
+        # Remove tags
+        self.conn.execute("DELETE FROM object_tags WHERE object_id = ?", (obj_id,))
+
+        # Remove file record
+        self.conn.execute("DELETE FROM files WHERE object_id = ?", (obj_id,))
+
+        # Tombstone the object row: clear content, set purged_at.
+        # This UPDATE fires the objects_history_update trigger (which records the
+        # pre-tombstone state), so we delete history AFTER the UPDATE to ensure
+        # the trigger-created entry is also cleaned up.
+        self.conn.execute(
+            """UPDATE objects SET
+                title = '[Purged]',
+                summary = NULL,
+                content = NULL,
+                content_hash = NULL,
+                purged_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+                deleted_at = COALESCE(deleted_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+            WHERE id = ?""",
+            (obj_id,),
+        )
+
+        # Remove history entries AFTER the tombstone UPDATE, because the UPDATE
+        # fires the history trigger which would re-create an entry.
+        self.conn.execute("DELETE FROM object_history WHERE object_id = ?", (obj_id,))
+
+        return True
 
     def undelete(self, obj_id: str) -> bool:
         """Restore a soft-deleted object by clearing deleted_at.
@@ -354,7 +379,7 @@ class ObjectRepo:
         return cursor.rowcount > 0
 
     def list_deleted(self, limit: int = 50) -> list[dict]:
-        """List all soft-deleted objects."""
+        """List all soft-deleted objects (excludes tombstoned/purged)."""
         rows = self.conn.execute(
             """SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
                       o.created_at, o.updated_at, o.deleted_at,
@@ -363,7 +388,7 @@ class ObjectRepo:
                FROM objects o
                JOIN objects t ON o.type_id = t.id
                JOIN objects s ON o.space_id = s.id
-               WHERE o.deleted_at IS NOT NULL
+               WHERE o.deleted_at IS NOT NULL AND o.purged_at IS NULL
                ORDER BY o.deleted_at DESC
                LIMIT ?""",
             (limit,),
@@ -410,7 +435,7 @@ class ObjectRepo:
         safe_query = '"' + query.replace('"', '""') + '"'
 
         system_filter = "" if include_system else "AND o.is_system_object = 0"
-        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL AND o.purged_at IS NULL"
 
         if sort_by and sort_by in _SORT_COLUMNS:
             sort_col = _SORT_COLUMNS[sort_by]
@@ -440,7 +465,7 @@ class ObjectRepo:
 
     def count(self, type_name: str | None = None, include_deleted: bool = False) -> int:
         """Count objects, optionally filtered by type name."""
-        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL"
+        deleted_filter = "" if include_deleted else "AND o.deleted_at IS NULL AND o.purged_at IS NULL"
         if type_name:
             if not type_name.strip():
                 return 0
@@ -451,7 +476,7 @@ class ObjectRepo:
                 (type_name.lower(),),
             ).fetchone()
         else:
-            deleted_where = "" if include_deleted else "WHERE o.deleted_at IS NULL"
+            deleted_where = "" if include_deleted else "WHERE o.deleted_at IS NULL AND o.purged_at IS NULL"
             row = self.conn.execute(
                 f"SELECT COUNT(*) as cnt FROM objects o {deleted_where}"
             ).fetchone()
@@ -459,7 +484,7 @@ class ObjectRepo:
 
     def count_by_type(self, include_deleted: bool = False) -> dict[str, int]:
         """Count objects grouped by type name."""
-        deleted_filter = "" if include_deleted else "WHERE o.deleted_at IS NULL"
+        deleted_filter = "" if include_deleted else "WHERE o.deleted_at IS NULL AND o.purged_at IS NULL"
         rows = self.conn.execute(
             f"""SELECT t.title as type_name, COUNT(*) as cnt
                FROM objects o
@@ -559,6 +584,20 @@ class ObjectRepo:
             )
             count += 1
         return count
+
+    def count_deleted(self) -> int:
+        """Count soft-deleted objects (excludes tombstoned/purged)."""
+        row = self.conn.execute(
+            "SELECT COUNT(*) as cnt FROM objects WHERE deleted_at IS NOT NULL AND purged_at IS NULL"
+        ).fetchone()
+        return row["cnt"]
+
+    def count_history_entries(self) -> int:
+        """Count total rows in object_history table."""
+        row = self.conn.execute(
+            "SELECT COUNT(*) as cnt FROM object_history"
+        ).fetchone()
+        return row["cnt"]
 
 
 class TagRepo:
@@ -681,7 +720,7 @@ class LinkRepo:
     def list_from(self, object_id: str) -> list[dict]:
         """List all links originating from an object."""
         rows = self.conn.execute(
-            """SELECT l.*, o.title as to_title
+            """SELECT l.*, o.title as to_title, o.purged_at as to_purged_at
                FROM links l
                JOIN objects o ON l.to_id = o.id
                WHERE l.from_id = ?
@@ -693,7 +732,7 @@ class LinkRepo:
     def list_to(self, object_id: str) -> list[dict]:
         """List all links pointing to an object."""
         rows = self.conn.execute(
-            """SELECT l.*, o.title as from_title
+            """SELECT l.*, o.title as from_title, o.purged_at as from_purged_at
                FROM links l
                JOIN objects o ON l.from_id = o.id
                WHERE l.to_id = ?

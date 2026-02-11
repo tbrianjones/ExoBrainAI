@@ -147,8 +147,22 @@ async def object_detail(request: Request, obj_id: str):
             # Try prefix match
             obj = obj_repo.get_by_prefix(obj_id)
         if obj is None:
-            ctx["error"] = "Object not found"
-            return templates.TemplateResponse("objects/detail_error.html", ctx, status_code=404)
+            # Check if it's a tombstone or soft-deleted object
+            obj = obj_repo.get(obj_id, include_deleted=True)
+            if obj is None:
+                obj = obj_repo.get_by_prefix(obj_id, include_deleted=True)
+            if obj is not None and obj.get("purged_at"):
+                # Tombstone: show dedicated page with preserved links
+                ctx["obj"] = obj
+                ctx["links"] = link_repo.list_all_for(obj["id"])
+                return templates.TemplateResponse("objects/detail_tombstone.html", ctx, status_code=410)
+            if obj is not None and obj.get("deleted_at"):
+                # Soft-deleted: show the normal detail page with a notice
+                ctx["obj"] = obj
+                ctx["is_deleted"] = True
+            else:
+                ctx["error"] = "Object not found"
+                return templates.TemplateResponse("objects/detail_error.html", ctx, status_code=404)
 
         ctx["obj"] = obj
         ctx["tags"] = tag_repo.list_for_object(obj["id"])

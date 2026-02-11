@@ -3,8 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.core.bootstrap import BOOTSTRAP_IDS, bootstrap
-from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
+from src.core.bootstrap import BOOTSTRAP_IDS
+from src.core.repository import ObjectRepo
 
 
 @pytest.fixture()
@@ -430,3 +430,143 @@ class TestLimitCap:
         client, data = populated_client
         resp = client.get("/ui-api/objects?limit=99999")
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Version history endpoint
+# ---------------------------------------------------------------------------
+
+class TestObjectHistory:
+
+    def test_history_returns_fragment(self, populated_client):
+        client, data = populated_client
+        obj_id = data["obj_a"]["id"]
+        resp = client.get(f"/ui-api/objects/{obj_id}/history")
+        assert resp.status_code == 200
+
+    def test_history_shows_versions_after_update(self, populated_client):
+        client, data = populated_client
+        conn = data["conn"]
+        obj_id = data["obj_a"]["id"]
+        # Create a version by updating
+        obj_repo = ObjectRepo(conn)
+        obj_repo.update(obj_id, title="Updated Alpha")
+        conn.commit()
+        resp = client.get(f"/ui-api/objects/{obj_id}/history")
+        assert resp.status_code == 200
+        # Template shows version numbers like "v1", "v2"
+        assert "v1" in resp.text
+
+    def test_history_nonexistent_object(self, client):
+        resp = client.get("/ui-api/objects/00000000-0000-0000-0000-000000000000/history")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Version diff endpoint
+# ---------------------------------------------------------------------------
+
+class TestObjectDiff:
+
+    def test_diff_returns_fragment(self, populated_client):
+        client, data = populated_client
+        conn = data["conn"]
+        obj_id = data["obj_a"]["id"]
+        # Create a version
+        obj_repo = ObjectRepo(conn)
+        obj_repo.update(obj_id, title="Diff Test Title")
+        conn.commit()
+        resp = client.get(f"/ui-api/objects/{obj_id}/diff/1")
+        assert resp.status_code == 200
+
+    def test_diff_shows_changes(self, populated_client):
+        client, data = populated_client
+        conn = data["conn"]
+        obj_id = data["obj_a"]["id"]
+        obj_repo = ObjectRepo(conn)
+        obj_repo.update(obj_id, content="Completely new content for diff test")
+        conn.commit()
+        resp = client.get(f"/ui-api/objects/{obj_id}/diff/1")
+        assert resp.status_code == 200
+        # Diff should show colored additions/deletions
+        assert "dcfce7" in resp.text or "fecaca" in resp.text
+
+    def test_diff_nonexistent_version(self, populated_client):
+        client, data = populated_client
+        obj_id = data["obj_a"]["id"]
+        resp = client.get(f"/ui-api/objects/{obj_id}/diff/999")
+        assert resp.status_code == 200
+        assert "not found" in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Delete / Purge POST endpoints
+# ---------------------------------------------------------------------------
+
+class TestDeletePurgeEndpoints:
+
+    def test_delete_requires_hx_request(self, populated_client):
+        client, data = populated_client
+        obj_id = data["obj_c"]["id"]
+        resp = client.post(f"/ui-api/objects/{obj_id}/delete")
+        assert resp.status_code == 403
+
+    def test_purge_requires_hx_request(self, populated_client):
+        client, data = populated_client
+        obj_id = data["obj_c"]["id"]
+        resp = client.post(f"/ui-api/objects/{obj_id}/purge")
+        assert resp.status_code == 403
+
+    def test_delete_with_hx_request_calls_cli(self, populated_client):
+        """With HX-Request header, delete endpoint should attempt CLI call.
+
+        In test env, the subprocess will fail (no CLI binary), but we should
+        get an HTML response (not a 403).
+        """
+        client, data = populated_client
+        obj_id = data["obj_c"]["id"]
+        resp = client.post(
+            f"/ui-api/objects/{obj_id}/delete",
+            headers={"HX-Request": "true"},
+        )
+        # Should not be 403 (the HX-Request check passed)
+        assert resp.status_code == 200
+
+    def test_purge_with_hx_request_calls_cli(self, populated_client):
+        client, data = populated_client
+        obj_id = data["obj_c"]["id"]
+        resp = client.post(
+            f"/ui-api/objects/{obj_id}/purge",
+            headers={"HX-Request": "true"},
+        )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Dashboard backup and health stats
+# ---------------------------------------------------------------------------
+
+class TestDashboardBackupStats:
+
+    def test_stats_includes_backup_info(self, client):
+        resp = client.get("/ui-api/stats")
+        assert resp.status_code == 200
+        assert "Backups" in resp.text
+
+    def test_stats_includes_data_health(self, client):
+        resp = client.get("/ui-api/stats")
+        assert resp.status_code == 200
+        assert "Data Health" in resp.text
+
+    def test_stats_includes_deleted_count(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/stats")
+        assert resp.status_code == 200
+        assert "Deleted Objects" in resp.text or "deleted" in resp.text.lower()
+
+    def test_stats_includes_history_count(self, populated_client):
+        client, data = populated_client
+        resp = client.get("/ui-api/stats")
+        assert resp.status_code == 200
+        assert "History" in resp.text or "history" in resp.text.lower()

@@ -70,3 +70,52 @@
         Path: <span class="font-mono text-gray-900 text-xs">{{ db_path }}</span>
     </div>
 </div>
+
+<!-- Backup & Health -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+    <!-- Backups -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Backups</h3>
+        <table class="w-full text-sm">
+            <tbody>
+                <tr class="border-b border-gray-100">
+                    <td class="py-1.5 text-gray-600">Last backup</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ last_backup_at }}</td>
+                </tr>
+                <tr class="border-b border-gray-100">
+                    <td class="py-1.5 text-gray-600">Backup count</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ backup_count }}</td>
+                </tr>
+                <tr class="border-b border-gray-100">
+                    <td class="py-1.5 text-gray-600">Total size</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ total_backup_size_mb }} MB</td>
+                </tr>
+                <tr class="border-b border-gray-100">
+                    <td class="py-1.5 text-gray-600">Interval</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ backup_interval }} min</td>
+                </tr>
+                <tr>
+                    <td class="py-1.5 text-gray-600">Retention</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ backup_retention_days }} days</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Data Health -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Data Health</h3>
+        <table class="w-full text-sm">
+            <tbody>
+                <tr class="border-b border-gray-100">
+                    <td class="py-1.5 text-gray-600">Soft-deleted objects</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ deleted_count }}</td>
+                </tr>
+                <tr>
+                    <td class="py-1.5 text-gray-600">Version history entries</td>
+                    <td class="py-1.5 text-right font-mono text-gray-900">{{ history_count }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

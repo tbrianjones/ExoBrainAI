@@ -1,9 +1,10 @@
-"""HTMX fragment endpoints (all GET, read-only) and CLI read wrappers."""
+"""HTMX fragment endpoints and CLI wrappers for the web UI."""
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import difflib
 import html as html_mod
 import json
 import mimetypes
@@ -65,6 +66,18 @@ async def dashboard_stats(request: Request):
                 "currently_projected_files": 0,
             }
 
+        # Data health
+        deleted_count = obj_repo.count_deleted()
+        history_count = obj_repo.count_history_entries()
+
+    # Backup info
+    from src.backup import list_backups
+    backups = list_backups()
+    backup_count = len(backups)
+    total_backup_size = sum(b.size_bytes for b in backups)
+    total_backup_size_mb = f"{total_backup_size / (1024 * 1024):.2f}" if total_backup_size > 0 else "0.00"
+    last_backup_at = backups[0].created_at.strftime("%Y-%m-%d %H:%M UTC") if backups else "Never"
+
     # DB size
     db_size_bytes = db_path.stat().st_size if db_path.exists() else 0
     db_size_mb = f"{db_size_bytes / (1024 * 1024):.2f}"
@@ -79,6 +92,13 @@ async def dashboard_stats(request: Request):
         "projection": projection,
         "db_size_mb": db_size_mb,
         "db_path": str(db_path),
+        "backup_count": backup_count,
+        "total_backup_size_mb": total_backup_size_mb,
+        "last_backup_at": last_backup_at,
+        "backup_interval": settings.backup_interval_minutes,
+        "backup_retention_days": settings.backup_retention_days,
+        "deleted_count": deleted_count,
+        "history_count": history_count,
     }
     return templates.TemplateResponse("dashboard/_stats.html", ctx)
 
@@ -205,6 +225,98 @@ async def list_objects(
         "order": order,
     }
     return templates.TemplateResponse("objects/_list.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Object version history and diff (HTMX partials)
+# ---------------------------------------------------------------------------
+
+@router.get("/objects/{obj_id}/history", response_class=HTMLResponse)
+async def object_history(request: Request, obj_id: str):
+    """Return version history list as an HTML fragment."""
+    templates = _templates(request)
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return HTMLResponse("<div class='text-red-600'>Database not found.</div>")
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        versions = obj_repo.list_history(obj_id)
+        obj = obj_repo.get(obj_id, include_deleted=True)
+
+    if obj is None:
+        return HTMLResponse("<div class='text-gray-500 text-sm'>Object not found.</div>")
+
+    ctx = {
+        "request": request,
+        "versions": versions,
+        "obj": obj,
+    }
+    return templates.TemplateResponse("objects/_history.html", ctx)
+
+
+def _render_diff_html(old_text: str, new_text: str) -> str:
+    """Generate HTML from a unified diff, with colored lines."""
+    old_lines = (old_text or "").splitlines(keepends=True)
+    new_lines = (new_text or "").splitlines(keepends=True)
+    diff_lines = difflib.unified_diff(old_lines, new_lines, lineterm="")
+
+    parts: list[str] = []
+    for line in diff_lines:
+        escaped = html_mod.escape(line.rstrip("\n"))
+        if line.startswith("@@"):
+            parts.append(f'<span class="text-blue-600">{escaped}</span>')
+        elif line.startswith("+"):
+            parts.append(f'<span style="background:#dcfce7;display:block">{escaped}</span>')
+        elif line.startswith("-"):
+            parts.append(f'<span style="background:#fecaca;display:block">{escaped}</span>')
+        else:
+            parts.append(f'<span style="display:block">{escaped}</span>')
+    return "\n".join(parts)
+
+
+@router.get("/objects/{obj_id}/diff/{version}", response_class=HTMLResponse)
+async def object_diff(request: Request, obj_id: str, version: int):
+    """Return diff between a historical version and the next version."""
+    templates = _templates(request)
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return HTMLResponse("<div class='text-red-600'>Database not found.</div>")
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        old_ver = obj_repo.get_version(obj_id, version)
+        if old_ver is None:
+            return HTMLResponse("<div class='text-gray-500 text-sm'>Version not found.</div>")
+
+        # The "next" version: check if version+1 exists in history; otherwise use the live object
+        next_ver = obj_repo.get_version(obj_id, version + 1)
+        if next_ver is None:
+            next_ver = obj_repo.get(obj_id, include_deleted=True)
+
+        if next_ver is None:
+            return HTMLResponse("<div class='text-gray-500 text-sm'>Object not found.</div>")
+
+        to_version = next_ver.get("version", version + 1)
+
+    # Build diffs for each field that changed
+    diffs = []
+    for field in ("title", "summary", "content"):
+        old_val = old_ver.get(field) or ""
+        new_val = next_ver.get(field) or ""
+        if old_val != new_val:
+            diff_html = _render_diff_html(old_val, new_val)
+            diffs.append({"field": field, "diff_html": diff_html})
+
+    ctx = {
+        "request": request,
+        "diffs": diffs,
+        "from_version": version,
+        "to_version": to_version,
+    }
+    return templates.TemplateResponse("objects/_diff.html", ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -499,3 +611,61 @@ async def cli_run(request: Request, cmd: str = ""):
         }
 
     return templates.TemplateResponse("cli/_output.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Object mutations (delete, purge) via CLI subprocess
+# ---------------------------------------------------------------------------
+
+@router.post("/objects/{obj_id}/delete", response_class=HTMLResponse)
+async def delete_object(obj_id: str, request: Request):
+    """Soft-delete an object via the CLI."""
+    if request.headers.get("HX-Request") != "true":
+        return HTMLResponse("Forbidden", status_code=403)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "exobrain", "delete", obj_id, "--yes", "--json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+
+        if proc.returncode == 0:
+            response = HTMLResponse('<div class="text-green-600 text-sm">Object deleted.</div>')
+            response.headers["HX-Redirect"] = "/ui/objects"
+            return response
+        else:
+            error = stderr.decode("utf-8", errors="replace") or stdout.decode("utf-8", errors="replace") or "Delete failed."
+            return HTMLResponse(f'<div class="text-red-600 text-sm">{html_mod.escape(error)}</div>')
+    except asyncio.TimeoutError:
+        return HTMLResponse('<div class="text-red-600 text-sm">Delete timed out after 30 seconds.</div>')
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-red-600 text-sm">{html_mod.escape(str(e))}</div>')
+
+
+@router.post("/objects/{obj_id}/purge", response_class=HTMLResponse)
+async def purge_object(obj_id: str, request: Request):
+    """Permanently purge an object via the CLI."""
+    if request.headers.get("HX-Request") != "true":
+        return HTMLResponse("Forbidden", status_code=403)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "exobrain", "purge", obj_id, "--yes", "--json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+
+        if proc.returncode == 0:
+            response = HTMLResponse('<div class="text-green-600 text-sm">Object purged.</div>')
+            response.headers["HX-Redirect"] = "/ui/objects"
+            return response
+        else:
+            error = stderr.decode("utf-8", errors="replace") or stdout.decode("utf-8", errors="replace") or "Purge failed."
+            return HTMLResponse(f'<div class="text-red-600 text-sm">{html_mod.escape(error)}</div>')
+    except asyncio.TimeoutError:
+        return HTMLResponse('<div class="text-red-600 text-sm">Purge timed out after 30 seconds.</div>')
+    except Exception as e:
+        return HTMLResponse(f'<div class="text-red-600 text-sm">{html_mod.escape(str(e))}</div>')

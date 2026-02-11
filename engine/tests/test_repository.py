@@ -287,12 +287,19 @@ class TestObjectRepoDelete:
         deleted_list = repo.list_deleted()
         assert any(r["id"] == obj_id for r in deleted_list)
 
-    def test_purge_removes_permanently(self, sample_objects):
+    def test_purge_tombstones_object(self, sample_objects):
         conn = sample_objects["conn"]
         repo = ObjectRepo(conn)
         obj_id = sample_objects["obj_c"]["id"]
         assert repo.purge(obj_id) is True
-        assert repo.get(obj_id, include_deleted=True) is None
+        # Tombstone: hidden from default get but visible with include_deleted
+        assert repo.get(obj_id) is None
+        tombstone = repo.get(obj_id, include_deleted=True)
+        assert tombstone is not None
+        assert tombstone["title"] == "[Purged]"
+        assert tombstone["summary"] is None
+        assert tombstone["content"] is None
+        assert tombstone["purged_at"] is not None
 
     def test_purge_removes_history(self, sample_objects):
         conn = sample_objects["conn"]
@@ -746,7 +753,7 @@ class TestConstraints:
         tags_after = tag_repo.list_for_object(obj_id)
         assert len(tags_after) == 0
 
-    def test_cascade_purge_removes_links(self, sample_objects):
+    def test_tombstone_purge_preserves_links(self, sample_objects):
         conn = sample_objects["conn"]
         obj_id = sample_objects["obj_a"]["id"]
         link_repo = LinkRepo(conn)
@@ -758,8 +765,9 @@ class TestConstraints:
 
         obj_repo.purge(obj_id)
 
+        # Tombstone preserves links (the whole point of tombstoning)
         links_after = link_repo.list_all_for(obj_id)
-        assert len(links_after) == 0
+        assert len(links_after) == len(links_before)
 
     def test_cascade_purge_removes_file_record(self, sample_objects, _patched_settings):
         conn = sample_objects["conn"]
@@ -1279,3 +1287,204 @@ class TestLinkMetadata:
         ).fetchone()
         assert row["source"] == "ai"
         assert row["confidence"] == 0.85
+
+
+# ============================================================
+# Tombstone Purge
+# ============================================================
+
+
+class TestObjectRepoPurgeTombstone:
+    """Test tombstone purge behavior: clears content, preserves row and links."""
+
+    def test_purge_creates_tombstone(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        assert repo.purge(obj_id) is True
+
+        tombstone = repo.get(obj_id, include_deleted=True)
+        assert tombstone is not None
+        assert tombstone["title"] == "[Purged]"
+        assert tombstone["summary"] is None
+        assert tombstone["content"] is None
+        assert tombstone["content_hash"] is None
+        assert tombstone["purged_at"] is not None
+        assert tombstone["deleted_at"] is not None
+
+    def test_purge_sets_deleted_at_if_not_already(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        # Purge without soft-deleting first
+        repo.purge(obj_id)
+        tombstone = repo.get(obj_id, include_deleted=True)
+        assert tombstone["deleted_at"] is not None
+
+    def test_purge_preserves_existing_deleted_at(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        # Soft-delete first
+        repo.delete(obj_id)
+        deleted = repo.get(obj_id, include_deleted=True)
+        original_deleted_at = deleted["deleted_at"]
+        # Now purge
+        repo.purge(obj_id)
+        tombstone = repo.get(obj_id, include_deleted=True)
+        assert tombstone["deleted_at"] == original_deleted_at
+
+    def test_purge_hidden_from_default_get(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.purge(obj_id)
+        assert repo.get(obj_id) is None
+
+    def test_purge_hidden_from_list(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.purge(obj_id)
+        results = repo.list()
+        assert not any(r["id"] == obj_id for r in results)
+
+    def test_purge_hidden_from_search(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.purge(obj_id)
+        results = repo.search("observation")
+        assert not any(r["id"] == obj_id for r in results)
+
+    def test_purge_hidden_from_count(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        count_before = repo.count()
+        repo.purge(sample_objects["obj_c"]["id"])
+        assert repo.count() == count_before - 1
+
+    def test_purge_hidden_from_list_deleted(self, sample_objects):
+        """Tombstoned objects should not show in list_deleted (soft-delete recycle bin)."""
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+        repo.delete(obj_id)
+        assert any(r["id"] == obj_id for r in repo.list_deleted())
+        repo.purge(obj_id)
+        assert not any(r["id"] == obj_id for r in repo.list_deleted())
+
+    def test_purge_preserves_links(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        link_repo = LinkRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+
+        links_before = link_repo.list_all_for(obj_id)
+        assert len(links_before) > 0
+
+        repo.purge(obj_id)
+
+        links_after = link_repo.list_all_for(obj_id)
+        assert len(links_after) == len(links_before)
+
+    def test_purge_link_shows_purged_at(self, sample_objects):
+        """Links to purged objects include purged_at for tombstone styling."""
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        link_repo = LinkRepo(conn)
+
+        # obj_a -> obj_b (related-to); purge obj_b
+        repo.purge(sample_objects["obj_b"]["id"])
+        links = link_repo.list_from(sample_objects["obj_a"]["id"])
+        assert len(links) == 1
+        assert links[0]["to_purged_at"] is not None
+
+    def test_purge_nonexistent_returns_false(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        assert repo.purge("nonexistent-id") is False
+
+    def test_purge_clears_history(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_a"]["id"]
+        repo.update(obj_id, title="Changed for history test")
+        assert len(repo.list_history(obj_id)) > 0
+        repo.purge(obj_id)
+        assert len(repo.list_history(obj_id)) == 0
+
+    def test_purge_clears_tags(self, sample_objects):
+        conn = sample_objects["conn"]
+        obj_id = sample_objects["obj_a"]["id"]
+        tag_repo = TagRepo(conn)
+        obj_repo = ObjectRepo(conn)
+        assert len(tag_repo.list_for_object(obj_id)) > 0
+        obj_repo.purge(obj_id)
+        assert len(tag_repo.list_for_object(obj_id)) == 0
+
+    def test_purge_clears_file_record(self, sample_objects, _patched_settings):
+        conn = sample_objects["conn"]
+        obj_id = sample_objects["obj_a"]["id"]
+        file_repo = FileRepo(conn)
+        obj_repo = ObjectRepo(conn)
+
+        source = _patched_settings.data_dir / "purge_file_test.txt"
+        source.write_text("File for purge test")
+        file_repo.attach(obj_id, source)
+        assert file_repo.get(obj_id) is not None
+
+        obj_repo.purge(obj_id)
+        assert file_repo.get(obj_id) is None
+
+    def test_purge_removes_file_from_disk(self, sample_objects, _patched_settings):
+        conn = sample_objects["conn"]
+        obj_id = sample_objects["obj_a"]["id"]
+        file_repo = FileRepo(conn)
+        obj_repo = ObjectRepo(conn)
+
+        source = _patched_settings.data_dir / "purge_disk_test.txt"
+        source.write_text("Disk file for purge test")
+        file_repo.attach(obj_id, source)
+        full_path = file_repo.get_full_path(obj_id)
+        assert full_path.exists()
+
+        obj_repo.purge(obj_id)
+        assert not full_path.exists()
+
+
+# ============================================================
+# Count helpers
+# ============================================================
+
+
+class TestObjectRepoCountHelpers:
+    """Test count_deleted() and count_history_entries()."""
+
+    def test_count_deleted_zero_initially(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        assert repo.count_deleted() == 0
+
+    def test_count_deleted_increments(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        repo.delete(sample_objects["obj_c"]["id"])
+        assert repo.count_deleted() == 1
+
+    def test_count_deleted_excludes_purged(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        repo.delete(sample_objects["obj_c"]["id"])
+        assert repo.count_deleted() == 1
+        repo.purge(sample_objects["obj_c"]["id"])
+        assert repo.count_deleted() == 0
+
+    def test_count_history_entries_zero_initially(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        assert repo.count_history_entries() == 0
+
+    def test_count_history_entries_increments(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        repo.update(sample_objects["obj_a"]["id"], title="Changed title")
+        assert repo.count_history_entries() >= 1
