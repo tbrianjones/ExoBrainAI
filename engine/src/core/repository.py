@@ -184,15 +184,16 @@ class ObjectRepo:
         if space_name:
             # Match objects IN the space, objects in child spaces,
             # and the space/subspace objects themselves (type = 'Space')
+            safe_space = _escape_like(space_name.lower())
             conditions.append(
-                "(LOWER(s.title) = ? OR LOWER(s.title) LIKE ?"
+                "(LOWER(s.title) = ? OR LOWER(s.title) LIKE ? ESCAPE '\\'"
                 " OR (LOWER(t.title) = 'space'"
-                "     AND (LOWER(o.title) = ? OR LOWER(o.title) LIKE ?)))"
+                "     AND (LOWER(o.title) = ? OR LOWER(o.title) LIKE ? ESCAPE '\\')))"
             )
             params.append(space_name.lower())
-            params.append(space_name.lower() + "/%")
+            params.append(safe_space + "/%")
             params.append(space_name.lower())
-            params.append(space_name.lower() + "/%")
+            params.append(safe_space + "/%")
 
         if tag:
             query += " JOIN object_tags ot ON o.id = ot.object_id"
@@ -501,7 +502,8 @@ class ObjectRepo:
 
         rows = self.conn.execute(
             """SELECT id, title, summary FROM objects
-               WHERE type_id = ? ORDER BY title""",
+               WHERE type_id = ? AND deleted_at IS NULL AND purged_at IS NULL
+               ORDER BY title""",
             (BOOTSTRAP_IDS["type"],),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -512,7 +514,8 @@ class ObjectRepo:
 
         rows = self.conn.execute(
             """SELECT id, title, summary FROM objects
-               WHERE type_id = ? ORDER BY title""",
+               WHERE type_id = ? AND deleted_at IS NULL AND purged_at IS NULL
+               ORDER BY title""",
             (BOOTSTRAP_IDS["space"],),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -522,7 +525,8 @@ class ObjectRepo:
         from src.core.bootstrap import BOOTSTRAP_IDS
 
         row = self.conn.execute(
-            """SELECT id FROM objects WHERE type_id = ? AND LOWER(title) = ?""",
+            """SELECT id FROM objects WHERE type_id = ? AND LOWER(title) = ?
+               AND deleted_at IS NULL AND purged_at IS NULL""",
             (BOOTSTRAP_IDS["type"], name.lower()),
         ).fetchone()
         return row["id"] if row else None
@@ -533,7 +537,8 @@ class ObjectRepo:
 
         row = self.conn.execute(
             """SELECT id FROM objects WHERE type_id = ?
-               AND LOWER(title) = ?""",
+               AND LOWER(title) = ?
+               AND deleted_at IS NULL AND purged_at IS NULL""",
             (BOOTSTRAP_IDS["space"], name.lower()),
         ).fetchone()
         return row["id"] if row else None
@@ -544,7 +549,7 @@ class ObjectRepo:
             return []
         safe_prefix = _escape_like(prefix)
         rows = self.conn.execute(
-            "SELECT id, title FROM objects WHERE id LIKE ? ESCAPE '\\'",
+            "SELECT id, title FROM objects WHERE id LIKE ? ESCAPE '\\' AND deleted_at IS NULL AND purged_at IS NULL",
             (safe_prefix + "%",),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -552,7 +557,7 @@ class ObjectRepo:
     def verify_content_hashes(self) -> list[dict]:
         """Verify content hashes for all objects. Returns list of mismatches."""
         rows = self.conn.execute(
-            "SELECT id, title, summary, content, content_hash FROM objects"
+            "SELECT id, title, summary, content, content_hash FROM objects WHERE deleted_at IS NULL AND purged_at IS NULL"
         ).fetchall()
         mismatches = []
         for row in rows:
@@ -573,7 +578,7 @@ class ObjectRepo:
         Returns the number of objects updated.
         """
         rows = self.conn.execute(
-            "SELECT id, title, summary, content FROM objects WHERE content_hash IS NULL"
+            "SELECT id, title, summary, content FROM objects WHERE content_hash IS NULL AND deleted_at IS NULL AND purged_at IS NULL"
         ).fetchall()
         count = 0
         for row in rows:

@@ -4,7 +4,7 @@ import sqlite3
 
 import pytest
 
-from src.core.db import check_integrity, get_connection, init_db, run_migrations
+from src.core.db import check_integrity, get_connection, init_db, run_migrations, unit_of_work
 
 
 class TestGetConnection:
@@ -26,6 +26,12 @@ class TestGetConnection:
         conn = get_connection(tmp_db_path)
         assert conn.row_factory is sqlite3.Row
         conn.close()
+
+    def test_busy_timeout_set(self, tmp_db_path, _patched_settings):
+        conn = get_connection(tmp_db_path)
+        timeout = conn.execute("PRAGMA busy_timeout").fetchone()[0]
+        conn.close()
+        assert timeout == 5000
 
 
 class TestRunMigrations:
@@ -151,6 +157,43 @@ CREATE TABLE t2 (id INT);"""
         from src.core.db import _split_sql
         stmts = _split_sql("CREATE TABLE t1 (id INT)")
         assert len(stmts) == 1
+
+
+class TestUnitOfWork:
+    """Test the unit_of_work context manager."""
+
+    def test_unit_of_work_commits_on_success(self, tmp_path):
+        db_path = tmp_path / "uow_test.db"
+        with unit_of_work(db_path) as conn:
+            conn.execute("CREATE TABLE test_tbl (id INTEGER PRIMARY KEY, val TEXT)")
+            conn.execute("INSERT INTO test_tbl (val) VALUES ('hello')")
+
+        # Verify the data persists after the context manager exits
+        verify_conn = sqlite3.connect(str(db_path))
+        row = verify_conn.execute("SELECT val FROM test_tbl").fetchone()
+        verify_conn.close()
+        assert row is not None
+        assert row[0] == "hello"
+
+    def test_unit_of_work_rolls_back_on_error(self, tmp_path):
+        db_path = tmp_path / "uow_test.db"
+
+        # Create the table first so it exists for verification
+        setup_conn = sqlite3.connect(str(db_path))
+        setup_conn.execute("CREATE TABLE test_tbl (id INTEGER PRIMARY KEY, val TEXT)")
+        setup_conn.commit()
+        setup_conn.close()
+
+        with pytest.raises(RuntimeError):
+            with unit_of_work(db_path) as conn:
+                conn.execute("INSERT INTO test_tbl (val) VALUES ('should_vanish')")
+                raise RuntimeError("deliberate error")
+
+        # Verify the row was rolled back
+        verify_conn = sqlite3.connect(str(db_path))
+        row = verify_conn.execute("SELECT val FROM test_tbl").fetchone()
+        verify_conn.close()
+        assert row is None
 
 
 class TestFTS5IntegrityCheck:

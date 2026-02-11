@@ -2,7 +2,9 @@
 
 import html
 import re
+import secrets
 
+import nh3
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
@@ -12,54 +14,38 @@ from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
 
 router = APIRouter()
 
-# HTML tags allowed in rendered markdown output
-_SAFE_TAGS = {
-    "h1", "h2", "h3", "h4", "h5", "h6", "p", "br", "hr",
-    "ul", "ol", "li", "dl", "dt", "dd",
-    "strong", "em", "b", "i", "u", "s", "del", "ins", "mark", "sub", "sup",
-    "a", "code", "pre", "blockquote", "kbd", "var", "samp",
-    "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption",
-    "img", "figure", "figcaption",
-    "div", "span", "abbr", "details", "summary",
+_ALLOWED_TAGS = {
+    "p", "br", "strong", "em", "b", "i", "u", "s",
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "ul", "ol", "li",
+    "a", "img",
+    "pre", "code", "blockquote",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "hr", "div", "span",
+    "dl", "dt", "dd",
+    "sup", "sub",
+    "details", "summary",
 }
-_SAFE_ATTRS = {"a": {"href", "title"}, "img": {"src", "alt", "title"}, "td": {"align"}, "th": {"align"}}
 
-import re
-
-_TAG_RE = re.compile(r"<(/?)(\w+)([^>]*)(/?)>", re.DOTALL)
-_ATTR_RE = re.compile(r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|(\S+))')
-
+_ALLOWED_ATTRS = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "title"},
+    "td": {"align"},
+    "th": {"align"},
+    "code": {"class"},
+    "pre": {"class"},
+    "span": {"class"},
+    "div": {"class"},
+}
 
 def _sanitize_html(raw_html: str) -> str:
-    """Strip dangerous HTML tags and attributes from rendered markdown.
-
-    Allows safe formatting tags; removes script, iframe, event handlers, etc.
-    """
-    def _replace_tag(m: re.Match) -> str:
-        slash = m.group(1)
-        tag = m.group(2).lower()
-        attrs_str = m.group(3)
-        self_close = m.group(4)
-
-        if tag not in _SAFE_TAGS:
-            return ""
-
-        # Filter attributes
-        allowed = _SAFE_ATTRS.get(tag, set())
-        safe_attrs = []
-        for attr_m in _ATTR_RE.finditer(attrs_str):
-            attr_name = attr_m.group(1).lower()
-            attr_val = attr_m.group(2) or attr_m.group(3) or attr_m.group(4) or ""
-            if attr_name in allowed:
-                # Block javascript: URIs
-                if attr_name in ("href", "src") and attr_val.strip().lower().startswith("javascript:"):
-                    continue
-                safe_attrs.append(f'{attr_name}="{html.escape(attr_val)}"')
-
-        attr_str = (" " + " ".join(safe_attrs)) if safe_attrs else ""
-        return f"<{slash}{tag}{attr_str}{self_close}>"
-
-    return _TAG_RE.sub(_replace_tag, raw_html)
+    """Sanitize HTML using nh3 (safe by default)."""
+    return nh3.clean(
+        raw_html,
+        tags=_ALLOWED_TAGS,
+        attributes=_ALLOWED_ATTRS,
+        url_schemes={"http", "https", "mailto"},
+    )
 
 
 def _strip_frontmatter(text: str) -> str:
@@ -81,6 +67,11 @@ def _render_markdown(content: str) -> str:
     return _sanitize_html(raw_html)
 
 
+def _generate_csrf_token() -> str:
+    """Generate a random CSRF token."""
+    return secrets.token_hex(32)
+
+
 def _templates(request: Request):
     """Get the Jinja2 templates instance from app state."""
     return request.app.state.templates
@@ -100,7 +91,11 @@ async def dashboard(request: Request):
     """Dashboard page; stats loaded via HTMX."""
     templates = _templates(request)
     ctx = _base_context(request, "dashboard")
-    return templates.TemplateResponse("dashboard.html", ctx)
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("dashboard.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
 
 
 @router.get("/objects", response_class=HTMLResponse)
@@ -122,7 +117,11 @@ async def objects_browse(request: Request):
         ctx["spaces"] = []
         ctx["tags"] = []
 
-    return templates.TemplateResponse("objects/browse.html", ctx)
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("objects/browse.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
 
 
 @router.get("/objects/{obj_id}", response_class=HTMLResponse)
@@ -131,10 +130,15 @@ async def object_detail(request: Request, obj_id: str):
     templates = _templates(request)
     ctx = _base_context(request, "objects")
 
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+
     db_path = get_db_path()
     if not db_path.exists():
         ctx["error"] = "Database not found"
-        return templates.TemplateResponse("objects/detail_error.html", ctx, status_code=503)
+        response = templates.TemplateResponse("objects/detail_error.html", ctx, status_code=503)
+        response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+        return response
 
     with db_session(db_path) as conn:
         obj_repo = ObjectRepo(conn)
@@ -155,14 +159,18 @@ async def object_detail(request: Request, obj_id: str):
                 # Tombstone: show dedicated page with preserved links
                 ctx["obj"] = obj
                 ctx["links"] = link_repo.list_all_for(obj["id"])
-                return templates.TemplateResponse("objects/detail_tombstone.html", ctx, status_code=410)
+                response = templates.TemplateResponse("objects/detail_tombstone.html", ctx, status_code=410)
+                response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+                return response
             if obj is not None and obj.get("deleted_at"):
                 # Soft-deleted: show the normal detail page with a notice
                 ctx["obj"] = obj
                 ctx["is_deleted"] = True
             else:
                 ctx["error"] = "Object not found"
-                return templates.TemplateResponse("objects/detail_error.html", ctx, status_code=404)
+                response = templates.TemplateResponse("objects/detail_error.html", ctx, status_code=404)
+                response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+                return response
 
         ctx["obj"] = obj
         ctx["tags"] = tag_repo.list_for_object(obj["id"])
@@ -197,7 +205,9 @@ async def object_detail(request: Request, obj_id: str):
         else:
             ctx["content_html"] = None
 
-    return templates.TemplateResponse("objects/detail.html", ctx)
+    response = templates.TemplateResponse("objects/detail.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
 
 
 @router.get("/objects/{obj_id}/download")
@@ -354,7 +364,11 @@ async def files_explorer(request: Request):
     """File explorer page."""
     templates = _templates(request)
     ctx = _base_context(request, "files")
-    return templates.TemplateResponse("files/explorer.html", ctx)
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("files/explorer.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
 
 
 @router.get("/projection", response_class=HTMLResponse)
@@ -362,7 +376,11 @@ async def projection_status(request: Request):
     """Projection explorer page."""
     templates = _templates(request)
     ctx = _base_context(request, "projection")
-    return templates.TemplateResponse("projection/status.html", ctx)
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("projection/status.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
 
 
 @router.get("/console", response_class=HTMLResponse)
@@ -370,4 +388,8 @@ async def cli_console(request: Request):
     """CLI console page."""
     templates = _templates(request)
     ctx = _base_context(request, "console")
-    return templates.TemplateResponse("cli/console.html", ctx)
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("cli/console.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response

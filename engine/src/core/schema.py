@@ -62,6 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_links_to_id ON links(to_id);
 -- all tables unless they use WITHOUT ROWID. The objects table has a TEXT PRIMARY
 -- KEY (id) but still gets an implicit rowid. Do NOT add WITHOUT ROWID to the
 -- objects table; it would silently break all FTS5 triggers below.
+-- WARNING: Do NOT run VACUUM on this database. VACUUM reassigns rowids,
+-- breaking external-content FTS5 tables. Use incremental_vacuum instead.
 CREATE VIRTUAL TABLE IF NOT EXISTS objects_fts USING fts5(
     title, summary, content,
     content='objects', content_rowid='rowid'

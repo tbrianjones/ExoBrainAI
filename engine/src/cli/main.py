@@ -374,10 +374,9 @@ def capture(
         typer.echo("Error: provide content or at least a title", err=True)
         raise typer.Exit(1)
 
+    # Resolve type and space IDs before the mutation transaction.
     with _db_session() as conn:
         type_id = _resolve_type_id(conn, type_name)
-
-        # Default space: inbox
         if space_name:
             space_id = _resolve_space_id(conn, space_name)
         else:
@@ -385,10 +384,11 @@ def capture(
 
             space_id = BOOTSTRAP_IDS["inbox"]
 
-        # Atomic: create object, add tags, attach file in one transaction.
-        # Individual repo methods commit internally, but if file attach fails
-        # we want the whole operation to be visible as partial. Wrap the
-        # multi-step operation so failure is clear.
+    # Atomic: create object, add tags, attach file in one transaction.
+    # unit_of_work auto-commits on success, rolls back on any error.
+    from src.core.db import unit_of_work
+
+    with unit_of_work() as conn:
         obj_repo = ObjectRepo(conn)
         obj = obj_repo.create(
             type_id=type_id,
@@ -399,33 +399,23 @@ def capture(
             created_at=created_at,
         )
 
-        try:
-            # Set projection override if requested
-            if always_project:
-                obj_repo.update(obj["id"], projection_override="always")
+        if always_project:
+            obj_repo.update(obj["id"], projection_override="always")
 
-            # Add tags
-            if tags:
-                tag_repo = TagRepo(conn)
-                for tag_text in tags:
-                    tag_repo.add(obj["id"], tag_text)
+        if tags:
+            tag_repo = TagRepo(conn)
+            for tag_text in tags:
+                tag_repo.add(obj["id"], tag_text)
 
-            # Attach file
-            if file_path:
-                file_repo = FileRepo(conn)
-                file_repo.attach(obj["id"], file_path)
+        if file_path:
+            file_repo = FileRepo(conn)
+            file_repo.attach(obj["id"], file_path)
 
-            # Commit the entire transaction
-            conn.commit()
-        except Exception:
-            # Roll back the entire capture on failure
-            conn.rollback()
-            obj_repo.delete(obj["id"])
-            conn.commit()
-            raise
+        obj_id = obj["id"]
 
-        # Re-fetch with all data
-        obj = obj_repo.get(obj["id"])
+    # Re-fetch with all data in a separate read-only session.
+    with _db_session() as conn:
+        obj = ObjectRepo(conn).get(obj_id)
 
     if json_output:
         _output(obj, as_json=True)

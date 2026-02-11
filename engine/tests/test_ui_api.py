@@ -506,41 +506,65 @@ class TestObjectDiff:
 
 class TestDeletePurgeEndpoints:
 
-    def test_delete_requires_hx_request(self, populated_client):
+    def test_delete_requires_csrf(self, populated_client):
         client, data = populated_client
         obj_id = data["obj_c"]["id"]
         resp = client.post(f"/ui-api/objects/{obj_id}/delete")
         assert resp.status_code == 403
 
-    def test_purge_requires_hx_request(self, populated_client):
+    def test_purge_requires_csrf(self, populated_client):
         client, data = populated_client
         obj_id = data["obj_c"]["id"]
         resp = client.post(f"/ui-api/objects/{obj_id}/purge")
         assert resp.status_code == 403
 
-    def test_delete_with_hx_request_calls_cli(self, populated_client):
-        """With HX-Request header, delete endpoint should attempt CLI call.
+    def test_delete_with_valid_csrf_calls_cli(self, populated_client):
+        """With matching CSRF cookie and header, delete endpoint should attempt CLI call.
 
         In test env, the subprocess will fail (no CLI binary), but we should
         get an HTML response (not a 403).
         """
         client, data = populated_client
         obj_id = data["obj_c"]["id"]
+        csrf_token = "a" * 64
+        client.cookies.set("csrf_token", csrf_token)
         resp = client.post(
             f"/ui-api/objects/{obj_id}/delete",
-            headers={"HX-Request": "true"},
+            headers={"X-CSRF-Token": csrf_token},
         )
-        # Should not be 403 (the HX-Request check passed)
+        # Should not be 403 (the CSRF check passed)
         assert resp.status_code == 200
 
-    def test_purge_with_hx_request_calls_cli(self, populated_client):
+    def test_purge_with_valid_csrf_calls_cli(self, populated_client):
         client, data = populated_client
         obj_id = data["obj_c"]["id"]
+        csrf_token = "b" * 64
+        client.cookies.set("csrf_token", csrf_token)
         resp = client.post(
             f"/ui-api/objects/{obj_id}/purge",
-            headers={"HX-Request": "true"},
+            headers={"X-CSRF-Token": csrf_token},
         )
         assert resp.status_code == 200
+
+    def test_csrf_mismatch_rejected(self, populated_client):
+        """POST with mismatched CSRF cookie and header should be rejected."""
+        client, data = populated_client
+        obj_id = data["obj_c"]["id"]
+        client.cookies.set("csrf_token", "cookie_token_value_aaa")
+        resp = client.post(
+            f"/ui-api/objects/{obj_id}/delete",
+            headers={"X-CSRF-Token": "header_token_value_bbb"},
+        )
+        assert resp.status_code == 403
+
+    def test_csrf_missing_rejected(self, populated_client):
+        """POST with no CSRF token at all should be rejected."""
+        client, data = populated_client
+        obj_id = data["obj_c"]["id"]
+        # Clear any cookies
+        client.cookies.clear()
+        resp = client.post(f"/ui-api/objects/{obj_id}/delete")
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------------------
@@ -570,3 +594,43 @@ class TestDashboardBackupStats:
         resp = client.get("/ui-api/stats")
         assert resp.status_code == 200
         assert "History" in resp.text or "history" in resp.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
+
+class TestSecurityHeaders:
+
+    def test_csp_header_present(self, client):
+        """GET /ui/ should include a Content-Security-Policy header."""
+        resp = client.get("/ui/")
+        assert resp.status_code == 200
+        csp = resp.headers.get("Content-Security-Policy")
+        assert csp is not None
+        assert "default-src 'self'" in csp
+        assert "script-src" in csp
+        assert "frame-src 'none'" in csp
+
+
+# ---------------------------------------------------------------------------
+# File preview size limit
+# ---------------------------------------------------------------------------
+
+class TestFilePreviewSizeLimit:
+
+    def test_preview_rejects_large_file(self, client, _patched_settings):
+        """Files over MAX_PREVIEW_BYTES should return 'too_large' preview."""
+        from src.config import settings
+
+        # Create a file that exceeds the 10 MB limit
+        files_dir = settings.files_dir
+        files_dir.mkdir(parents=True, exist_ok=True)
+        large_file = files_dir / "bigfile.txt"
+        # Write just over 10 MB
+        large_file.write_bytes(b"x" * (10 * 1024 * 1024 + 1))
+
+        resp = client.get("/ui-api/files/preview?root=files&path=bigfile.txt")
+        assert resp.status_code == 200
+        assert "too large" in resp.text.lower()
+        assert "10 MB" in resp.text

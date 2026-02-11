@@ -1488,3 +1488,147 @@ class TestObjectRepoCountHelpers:
         repo = ObjectRepo(conn)
         repo.update(sample_objects["obj_a"]["id"], title="Changed title")
         assert repo.count_history_entries() >= 1
+
+
+# ============================================================
+# LIKE Wildcard Injection & Soft-Delete Filter Standardization
+# ============================================================
+
+
+class TestSpaceFilterWildcardEscaping:
+    """Test that LIKE wildcards in space names are escaped in list()."""
+
+    def test_list_space_with_wildcard_chars(self, bootstrapped_db):
+        """A space name containing '%' or '_' should not match unrelated objects."""
+        repo = ObjectRepo(bootstrapped_db)
+
+        # Create a normal space and an object in it
+        normal_space = repo.create(
+            type_id=BOOTSTRAP_IDS["space"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="safe/normal",
+        )
+        normal_obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=normal_space["id"],
+            title="Normal Doc",
+        )
+
+        # Create a space with wildcard characters
+        wild_space = repo.create(
+            type_id=BOOTSTRAP_IDS["space"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="safe/%wild",
+        )
+        wild_obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=wild_space["id"],
+            title="Wild Doc",
+        )
+        bootstrapped_db.commit()
+
+        # Listing by the wildcard space should only return objects in that space,
+        # not objects in "safe/normal" (which '%' would match without escaping)
+        results = repo.list(space_name="safe/%wild", include_system=True)
+        result_ids = {r["id"] for r in results}
+        assert wild_obj["id"] in result_ids
+        assert normal_obj["id"] not in result_ids
+
+
+class TestResolvePrefixExcludesDeleted:
+    """Test that resolve_prefix_matches excludes soft-deleted and purged objects."""
+
+    def test_resolve_prefix_excludes_deleted(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        obj_id = sample_objects["obj_c"]["id"]
+
+        # Verify prefix matches before deletion
+        prefix = obj_id[:30]
+        matches_before = repo.resolve_prefix_matches(prefix)
+        assert any(m["id"] == obj_id for m in matches_before)
+
+        # Soft-delete
+        repo.delete(obj_id)
+
+        # Should no longer appear in prefix matches
+        matches_after = repo.resolve_prefix_matches(prefix)
+        assert not any(m["id"] == obj_id for m in matches_after)
+
+
+class TestListTypesExcludesDeleted:
+    """Test that list_types excludes soft-deleted type objects."""
+
+    def test_list_types_excludes_deleted(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+
+        # Create a custom type
+        custom_type = repo.create(
+            type_id=BOOTSTRAP_IDS["type"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="CustomTestType",
+        )
+        bootstrapped_db.commit()
+
+        # Verify it appears in list_types
+        types_before = repo.list_types()
+        assert any(t["title"] == "CustomTestType" for t in types_before)
+
+        # Soft-delete the type
+        repo.delete(custom_type["id"])
+
+        # Should no longer appear in list_types
+        types_after = repo.list_types()
+        assert not any(t["title"] == "CustomTestType" for t in types_after)
+
+
+class TestListSpacesExcludesDeleted:
+    """Test that list_spaces excludes soft-deleted space objects."""
+
+    def test_list_spaces_excludes_deleted(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+
+        # Create a custom space
+        custom_space = repo.create(
+            type_id=BOOTSTRAP_IDS["space"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="test-delete-space",
+        )
+        bootstrapped_db.commit()
+
+        # Verify it appears in list_spaces
+        spaces_before = repo.list_spaces()
+        assert any(s["title"] == "test-delete-space" for s in spaces_before)
+
+        # Soft-delete the space
+        repo.delete(custom_space["id"])
+
+        # Should no longer appear in list_spaces
+        spaces_after = repo.list_spaces()
+        assert not any(s["title"] == "test-delete-space" for s in spaces_after)
+
+
+class TestVerifyHashesExcludesPurged:
+    """Test that verify_content_hashes excludes purged objects."""
+
+    def test_verify_hashes_excludes_purged(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+
+        # Tamper with a content hash to create a mismatch we can detect
+        obj_id = sample_objects["obj_c"]["id"]
+        conn.execute(
+            "UPDATE objects SET content_hash = 'badhash' WHERE id = ?",
+            (obj_id,),
+        )
+
+        # Verify the mismatch is detected before purge
+        mismatches_before = repo.verify_content_hashes()
+        assert any(m["id"] == obj_id for m in mismatches_before)
+
+        # Purge the object
+        repo.purge(obj_id)
+
+        # The purged object should no longer appear in hash verification
+        mismatches_after = repo.verify_content_hashes()
+        assert not any(m["id"] == obj_id for m in mismatches_after)

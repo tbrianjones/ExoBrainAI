@@ -147,6 +147,8 @@ def calculate_scores(conn: sqlite3.Connection) -> list[ObjectScore]:
             FROM objects o
             JOIN objects s ON o.space_id = s.id
             WHERE o.type_id NOT IN ({placeholders})
+              AND o.deleted_at IS NULL
+              AND o.purged_at IS NULL
             ORDER BY o.updated_at DESC""",
         bootstrap_type_ids,
     ).fetchall()
@@ -320,6 +322,8 @@ def generate_claude_md(conn: sqlite3.Connection, space_path: str) -> str:
            JOIN objects s ON o.space_id = s.id
            LEFT JOIN object_tags ot ON o.id = ot.object_id
            WHERE s.title = ?
+             AND o.deleted_at IS NULL
+             AND o.purged_at IS NULL
            GROUP BY o.id
            ORDER BY o.updated_at DESC""",
         (space_path,),
@@ -427,9 +431,10 @@ def run_projection_cycle(
     for candidate in candidates:
         if dry_run:
             projected_count += 1
-            space_path = _get_space_path(conn,
-                conn.execute("SELECT space_id FROM objects WHERE id = ?", (candidate.id,)).fetchone()["space_id"]
-            )
+            row = conn.execute("SELECT space_id FROM objects WHERE id = ?", (candidate.id,)).fetchone()
+            if row is None:
+                continue  # Object was deleted concurrently, skip
+            space_path = _get_space_path(conn, row["space_id"])
             projected_spaces.add(space_path)
         else:
             result = project_object(conn, candidate.id)

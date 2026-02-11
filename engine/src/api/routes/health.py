@@ -1,8 +1,11 @@
 """Health and status endpoints."""
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter
 
 from src import __version__
+from src.backup import list_backups
 from src.config import settings
 
 router = APIRouter()
@@ -13,17 +16,47 @@ async def health():
     """Health check endpoint.
 
     Returns basic health status for Docker health checks and monitoring.
+    Includes backup staleness detection: if the most recent backup is older
+    than 2x the configured backup interval, overall status is degraded.
     """
     from src.core.db import get_db_path
 
     db_exists = get_db_path().exists()
     projected_dir_exists = settings.projected_dir.exists()
 
+    # Backup health
+    now = datetime.now(timezone.utc)
+    try:
+        backups = list_backups()
+    except Exception:
+        backups = []
+    if backups:
+        last_backup = backups[0]  # newest first
+        last_backup_at = last_backup.created_at.isoformat()
+        backup_age_seconds = (now - last_backup.created_at).total_seconds()
+        max_age_seconds = settings.backup_interval_minutes * 60 * 2
+        backup_healthy = backup_age_seconds <= max_age_seconds
+    else:
+        last_backup_at = None
+        backup_age_seconds = None
+        backup_healthy = False
+
+    status = "ok"
+    if not db_exists:
+        status = "degraded"
+    elif not backup_healthy:
+        status = "degraded"
+
     return {
-        "status": "ok" if db_exists else "degraded",
+        "status": status,
         "version": __version__,
         "db_exists": db_exists,
         "projected_dir_exists": projected_dir_exists,
+        "backup": {
+            "last_backup_at": last_backup_at,
+            "backup_age_seconds": backup_age_seconds,
+            "backup_healthy": backup_healthy,
+        },
     }
 
 

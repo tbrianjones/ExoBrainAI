@@ -1,5 +1,9 @@
 """SQLite connection management, WAL mode, and migration runner."""
 
+# SAFETY: Never call VACUUM on the ExoBrain database.
+# VACUUM reassigns rowids, breaking external-content FTS5 tables.
+# Use incremental_vacuum instead. See schema.py for details.
+
 from __future__ import annotations
 
 import sqlite3
@@ -84,6 +88,7 @@ def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
@@ -103,6 +108,32 @@ def db_session(db_path: Path | None = None) -> Generator[sqlite3.Connection, Non
     conn = get_connection(db_path)
     try:
         yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def unit_of_work(db_path: Path | None = None) -> Generator[sqlite3.Connection, None, None]:
+    """Context manager for atomic multi-step operations.
+
+    Commits on success, rolls back on error. Unlike db_session(), this
+    manages transaction boundaries automatically.
+
+    Usage:
+        with unit_of_work() as conn:
+            repo = ObjectRepo(conn)
+            obj = repo.create(...)
+            tag_repo = TagRepo(conn)
+            tag_repo.add(obj["id"], "mytag")
+            # auto-commits if no exception
+    """
+    conn = get_connection(db_path)
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 

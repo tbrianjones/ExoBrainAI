@@ -514,3 +514,79 @@ class TestGetTierStatus:
         assert status["always_project"][0]["id"] == obj_a["id"][:12]
         assert len(status["never_project"]) == 1
         assert status["never_project"][0]["id"] == obj_b["id"][:12]
+
+
+class TestDeletedPurgedExclusion:
+    """Tests that deleted and purged objects are excluded from projection scoring and CLAUDE.md."""
+
+    def test_deleted_objects_excluded_from_projection_scores(self, sample_objects):
+        """Soft-deleted objects should not appear in calculate_scores results."""
+        conn = sample_objects["conn"]
+        obj_a = sample_objects["obj_a"]
+
+        # Verify obj_a is included before deletion
+        scores_before = calculate_scores(conn)
+        score_ids_before = {s.id for s in scores_before}
+        assert obj_a["id"] in score_ids_before
+
+        # Soft-delete obj_a
+        conn.execute(
+            "UPDATE objects SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+            (obj_a["id"],),
+        )
+        conn.commit()
+
+        # Verify obj_a is excluded after deletion
+        scores_after = calculate_scores(conn)
+        score_ids_after = {s.id for s in scores_after}
+        assert obj_a["id"] not in score_ids_after
+        assert len(scores_after) == len(scores_before) - 1
+
+    def test_purged_objects_excluded_from_projection_scores(self, sample_objects):
+        """Purged (tombstoned) objects should not appear in calculate_scores results."""
+        conn = sample_objects["conn"]
+        obj_b = sample_objects["obj_b"]
+
+        # Verify obj_b is included before purge
+        scores_before = calculate_scores(conn)
+        score_ids_before = {s.id for s in scores_before}
+        assert obj_b["id"] in score_ids_before
+
+        # Purge obj_b (set both purged_at and deleted_at as the real purge does)
+        conn.execute(
+            """UPDATE objects SET
+                purged_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+                deleted_at = COALESCE(deleted_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+               WHERE id = ?""",
+            (obj_b["id"],),
+        )
+        conn.commit()
+
+        # Verify obj_b is excluded after purge
+        scores_after = calculate_scores(conn)
+        score_ids_after = {s.id for s in scores_after}
+        assert obj_b["id"] not in score_ids_after
+        assert len(scores_after) == len(scores_before) - 1
+
+    def test_deleted_objects_excluded_from_claude_md(self, sample_objects, _patched_settings):
+        """Soft-deleted objects should not appear in generate_claude_md output."""
+        conn = sample_objects["conn"]
+        obj_a = sample_objects["obj_a"]
+
+        # Verify obj_a appears before deletion
+        content_before = generate_claude_md(conn, "primitives")
+        assert "Alpha Document" in content_before
+
+        # Soft-delete obj_a
+        conn.execute(
+            "UPDATE objects SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?",
+            (obj_a["id"],),
+        )
+        conn.commit()
+
+        # Verify obj_a no longer appears
+        content_after = generate_claude_md(conn, "primitives")
+        assert "Alpha Document" not in content_after
+        # Other objects should still be present
+        assert "Beta Document" in content_after
+        assert "Gamma Note" in content_after

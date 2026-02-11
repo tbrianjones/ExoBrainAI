@@ -8,6 +8,7 @@ import difflib
 import html as html_mod
 import json
 import mimetypes
+import secrets
 from pathlib import Path
 
 import yaml
@@ -20,8 +21,18 @@ from src.core.db import db_session, get_db_path
 from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
 
 MAX_LIMIT = 200
+MAX_PREVIEW_BYTES = 10 * 1024 * 1024  # 10 MB
 
 router = APIRouter()
+
+
+def _verify_csrf(request: Request) -> bool:
+    """Verify CSRF token: cookie must match X-CSRF-Token header."""
+    cookie_token = request.cookies.get("csrf_token")
+    header_token = request.headers.get("X-CSRF-Token")
+    if not cookie_token or not header_token:
+        return False
+    return secrets.compare_digest(cookie_token, header_token)
 
 
 def _templates(request: Request):
@@ -168,7 +179,10 @@ async def list_objects(
 
             # Also search by ID prefix if query looks like a UUID
             if _looks_like_uuid_prefix(query_text):
+                from src.core.repository import _escape_like
+
                 system_filter = "" if include_system else "AND o.is_system_object = 0"
+                safe_prefix = _escape_like(query_text.lower())
                 id_rows = conn.execute(
                     f"""SELECT o.id, o.type_id, o.space_id, o.title, o.summary,
                                o.created_at, o.updated_at,
@@ -178,9 +192,10 @@ async def list_objects(
                         JOIN objects t ON o.type_id = t.id
                         JOIN objects s ON o.space_id = s.id
                         WHERE o.id LIKE ? ESCAPE '\\'
+                        AND o.deleted_at IS NULL AND o.purged_at IS NULL
                         {system_filter}
                         LIMIT ?""",
-                    (query_text.lower() + "%", limit),
+                    (safe_prefix + "%", limit),
                 ).fetchall()
                 # Merge ID matches (deduplicate by id)
                 seen_ids = {obj["id"] for obj in objects}
@@ -398,8 +413,21 @@ async def file_preview(request: Request, root: str = "files", path: str = ""):
     if target is None or not target.exists() or not target.is_file():
         return HTMLResponse("<div class='text-gray-500 text-sm'>File not found.</div>")
 
+    file_size = target.stat().st_size
+    if file_size > MAX_PREVIEW_BYTES:
+        ctx = {
+            "request": request,
+            "file_path": path,
+            "mime_type": mimetypes.guess_type(str(target))[0] or "application/octet-stream",
+            "size": _human_size(file_size),
+            "preview_type": "too_large",
+            "content": None,
+            "frontmatter": None,
+        }
+        return templates.TemplateResponse("files/_preview.html", ctx)
+
     mime_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
-    size = _human_size(target.stat().st_size)
+    size = _human_size(file_size)
 
     ctx = {
         "request": request,
@@ -567,6 +595,7 @@ async def cli_run(request: Request, cmd: str = ""):
 
         proc = await asyncio.create_subprocess_exec(
             *args,
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -620,12 +649,13 @@ async def cli_run(request: Request, cmd: str = ""):
 @router.post("/objects/{obj_id}/delete", response_class=HTMLResponse)
 async def delete_object(obj_id: str, request: Request):
     """Soft-delete an object via the CLI."""
-    if request.headers.get("HX-Request") != "true":
+    if not _verify_csrf(request):
         return HTMLResponse("Forbidden", status_code=403)
 
     try:
         proc = await asyncio.create_subprocess_exec(
             "exobrain", "delete", obj_id, "--yes", "--json",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -647,12 +677,13 @@ async def delete_object(obj_id: str, request: Request):
 @router.post("/objects/{obj_id}/purge", response_class=HTMLResponse)
 async def purge_object(obj_id: str, request: Request):
     """Permanently purge an object via the CLI."""
-    if request.headers.get("HX-Request") != "true":
+    if not _verify_csrf(request):
         return HTMLResponse("Forbidden", status_code=403)
 
     try:
         proc = await asyncio.create_subprocess_exec(
             "exobrain", "purge", obj_id, "--yes", "--json",
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )

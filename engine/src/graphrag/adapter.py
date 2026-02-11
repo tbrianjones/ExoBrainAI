@@ -62,6 +62,8 @@ def stage_for_graphrag(conn: sqlite3.Connection) -> dict:
             JOIN objects t ON o.type_id = t.id
             JOIN objects s ON o.space_id = s.id
             WHERE o.type_id NOT IN ({placeholders})
+              AND o.deleted_at IS NULL
+              AND o.purged_at IS NULL
             ORDER BY o.created_at""",
         tuple(_SYSTEM_TYPE_IDS),
     ).fetchall()

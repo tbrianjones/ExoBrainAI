@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src import __version__
 from src.api.routes import admin, docs, health, query
@@ -45,11 +46,28 @@ app = FastAPI(
 # CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["http://localhost:8420", "http://127.0.0.1:8420"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["HX-Request", "HX-Target", "HX-Trigger", "Content-Type", "X-CSRF-Token"],
 )
+
+
+class CSPMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-src 'none'; "
+            "object-src 'none'"
+        )
+        return response
+
+app.add_middleware(CSPMiddleware)
 
 # Jinja2 templates and static files for the web UI
 _templates_dir = Path(__file__).parent / "templates"

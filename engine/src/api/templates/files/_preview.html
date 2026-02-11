@@ -19,6 +19,11 @@
     <img src="data:{{ mime_type }};base64,{{ content }}" alt="{{ file_path }}" class="max-w-full rounded">
     {% elif preview_type == 'text' %}
     <pre class="bg-gray-50 rounded p-4 text-xs overflow-x-auto whitespace-pre-wrap text-gray-800">{{ content }}</pre>
+    {% elif preview_type == 'too_large' %}
+    <div class="text-gray-500 text-sm">
+        <p>File too large to preview ({{ size }}).</p>
+        <p class="text-xs mt-1">Maximum preview size: 10 MB</p>
+    </div>
     {% else %}
     <div class="text-gray-500 text-sm">Preview not available for this file type.</div>
     {% endif %}
