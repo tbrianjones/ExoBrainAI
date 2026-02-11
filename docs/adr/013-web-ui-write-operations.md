@@ -123,6 +123,21 @@ POST handlers verify the `HX-Request` header and return HTMX fragments that upda
 
 The migration adds the column as nullable with no default, requiring no data backfill.
 
+## Generated Skills
+
+### `add-web-ui-write-operation`
+
+Step-by-step checklist for adding a new write operation to the ExoBrain web UI. Use when user mentions add write operation, UI write, web delete, web edit, UI mutation, or POST endpoint.
+
+**Workflow:**
+1. Ensure the CLI command exists for the operation (CLI is sole write interface per ADR-003)
+2. Add POST endpoint under `/ui-api/` prefix in route handlers
+3. Implement via `asyncio.create_subprocess_exec("exobrain", ...)` to invoke CLI
+4. Verify `HX-Request: true` header on the POST endpoint; reject requests without it
+5. Add `hx-confirm` attribute on the UI trigger element for destructive operations
+6. Return HTMX fragment that updates the relevant page section in place
+7. Log subprocess invocations (command, exit code, stderr) for debugging
+
 ## Agent Rules
 
 - MUST verify the `HX-Request` header on all POST endpoints; reject requests without it

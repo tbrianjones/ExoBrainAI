@@ -57,6 +57,7 @@ docker compose exec exobrain exobrain status
 | `/generate-new-view-command` | User wants to create a new specialized view generator |
 | `/publish-quarto` | Publish a view to ideas.tbrianjones.com |
 | `/test-system` | Run end-to-end integration test simulating a real user session |
+| `/generate-docs` | Generate Skills, AGENTS.md, and README.md from ADRs and codebase analysis |
 
 ## Agents
 
@@ -64,6 +65,12 @@ docker compose exec exobrain exobrain status
 |-------|------------|
 | `transcript-summary-generator` | Called by `/generate-transcript`; produces synthesized Ideas & Themes |
 | `transcript-raw-generator` | Called by `/generate-transcript`; produces verbatim Full Transcript |
+| `docs-planner` | Called by `/generate-docs`; analyzes codebase and produces plan file |
+| `docs-adr-skill-generator` | Called by `/generate-docs`; generates skill from one ADR's `## Generated Skills` |
+| `docs-area-batch-generator` | Called by `/generate-docs`; generates README.md and AGENTS.md for a batch of areas |
+| `docs-generator` | Called by `/generate-docs`; generates root CLAUDE.md, AGENTS.md, README.md |
+| `docs-reviewer` | Called by `/generate-docs`; validates generated docs against ADR-015 rules |
+| `docs-harmonizer` | Called by `/generate-docs`; harmonizes cross-area consistency, removes redundancy |
 
 ## Skills
 
@@ -240,6 +247,8 @@ ADRs document key architectural choices. Read these before making significant ch
 | [012](docs/adr/012-object-versioning-and-backup.md) | Object versioning (trigger-based history), soft/hard delete, automated SQLite backup |
 | [013](docs/adr/013-web-ui-write-operations.md) | Web UI write operations via CLI subprocess; tombstone purge; HTMX POST with HX-Request verification |
 | [014](docs/adr/014-inline-content-references.md) | Inline content references via `[[uuid\|display text]]` wiki-link syntax; post-sanitization rendering in web UI |
+| [015](docs/adr/015-documentation-system.md) | ADR-centric documentation generation; 4-phase workflow (Plan, Generate, Review, Harmonize); skills from ADRs |
+| [016](docs/adr/016-agentic-exobrain-interface.md) | Agentic ExoBrain interface specification; CLI via Docker, JSON schemas, hybrid read/write pattern |
 
 ## Behavior
 

@@ -106,6 +106,21 @@ When write operations are needed in the UI, they should go through CLI subproces
 - Future write operations will require additional architectural decisions
 - The UI is coupled to the repository layer API, which is stable
 
+## Generated Skills
+
+### `add-web-ui-page`
+
+Step-by-step checklist for adding a new page to the ExoBrain web UI. Use when user mentions add page, new page, web UI page, new view, add route, or UI route.
+
+**Workflow:**
+1. Create Jinja2 template in `engine/src/api/templates/` following existing patterns
+2. Add GET route under `/ui/` prefix in `engine/src/api/routes.py`
+3. Use repository layer for data access (ObjectRepo, TagRepo, LinkRepo, FileRepo); no direct SQL
+4. Add HTMX fragment endpoint under `/ui-api/` prefix if dynamic content needed
+5. Validate file paths against `$EXOBRAIN_DATA_DIR` if displaying file content (path traversal safety)
+6. Render markdown server-side via the `markdown` Python library
+7. Use Tailwind CSS utility classes (CDN); no custom CSS files
+
 ## Agent Rules
 
 - MUST keep all UI endpoints as GET requests (read-only)

@@ -94,6 +94,24 @@ This is explicitly a "first UI" decision, not a "only UI" decision. A web UI or 
 
 7. **MUST** handle CLI errors gracefully. If a command fails, present the error to the user with suggested remediation (e.g., "ExoBrain container may not be running; try `docker compose up -d`").
 
+8. **MUST** distinguish between the three Claude Code extension types:
+   - **Commands** (`.claude/commands/`): Interactive; interview the user, have dialogue, require input. Invoked by users via `/command-name`.
+   - **Agents** (`.claude/agents/`): Autonomous; run in their own context without further user input. Spawned by commands or other agents via the Task tool.
+   - **Skills** (`.claude/skills/`): Utilities invoked by commands or agents; never invoked directly by users. Provide reusable knowledge and workflows.
+
+9. **MUST** use the hybrid pattern for idea space workflows: projected files for reads, CLI for writes.
+   - **Read path**: Run `exobrain project` to refresh, then read markdown files from `$EXOBRAIN_DATA_DIR/projected/ideas/{space-name}/*.md`. Each file has YAML frontmatter + content body.
+   - **Write path**: Pipe content via stdin to `exobrain capture` with appropriate `--type`, `--space`, `--tag`, and `--always-project` flags. Run `exobrain project` after to make new objects visible as files.
+   - **Edit path**: Edit projected markdown files directly; the file watcher auto-syncs changes back to SQLite.
+   - **Discovery**: Use `exobrain space list --json` and filter for `ideas/` prefix.
+
+10. **MUST** follow style rules when generating content for ExoBrain objects:
+    - No dashes or double dashes; use semicolons or restructure sentences.
+    - Semicolons join related independent clauses.
+    - Ellipses for trailing off (use sparingly).
+    - Preserve the human's phrasing when it captures the idea well.
+    - Avoid flowery language.
+
 ## References
 
 - ExoBrain Skill: `.claude/skills/exobrain.md`

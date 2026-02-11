@@ -136,6 +136,20 @@ echo "My thought" | docker compose exec -T exobrain exobrain capture
 
 13. **MUST** use repository methods for all database lookups in CLI commands, including type/space resolution. Never execute raw SQL in CLI handlers. Use `ObjectRepo.resolve_type_by_name()`, `ObjectRepo.resolve_space_by_name()`, and `ObjectRepo.resolve_prefix_matches()` for name-to-ID resolution.
 
+## Generated Skills
+
+### `add-cli-command`
+
+Step-by-step checklist for adding a new CLI command to ExoBrain. Use when user mentions add command, new command, create command, CLI command, or new subcommand.
+
+**Workflow:**
+1. Add Typer command in `engine/src/cli/main.py` (or appropriate subcommand group)
+2. Implement `--json` flag support using `_output()` helper for structured output
+3. Add repository layer method if new data access is needed (in `engine/src/core/repository.py`)
+4. Use `_db_session()` context manager for all database access
+5. Write pytest tests in `engine/tests/` covering both human and JSON output modes
+6. Update root CLAUDE.md CLI commands table
+
 ## Future Work
 
 **JSON error output.** Rule 6 specifies that `--json` error output must include an `error` field. Currently, errors are written to stderr as plain text regardless of the `--json` flag. A future pass should wrap error paths so that `--json` produces `{"error": "message"}` on stderr with exit code 1.

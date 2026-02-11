@@ -109,6 +109,21 @@ The primary backup mechanism is Dropbox sync of `$EXOBRAIN_DATA_DIR`. Additional
 | 006 | 6 | Create View type and retype view-tagged Document objects to View |
 | 007 | 7 | Object versioning (`version`, `content_hash`, `deleted_at`), `object_history` table, history/version triggers, `backup_log` table |
 
+## Generated Skills
+
+### `add-database-migration`
+
+Step-by-step checklist for adding a new schema migration to ExoBrain. Use when user mentions add migration, new migration, schema change, add column, alter table, or database migration.
+
+**Workflow:**
+1. Run `exobrain backup` to create a pre-migration backup
+2. Add new migration entry to `MIGRATIONS` list in `engine/src/core/schema.py`
+3. Use additive DDL only: `ADD COLUMN`, `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`
+4. Test against both fresh databases (`exobrain init` on empty DB) and databases with existing data
+5. Run `exobrain init` to apply the migration
+6. Run `exobrain doctor` to verify integrity after migration
+7. Update the Schema Evolution History table in this ADR
+
 ## Agent Rules
 
 - MUST run `exobrain init` after any container rebuild; it is always safe and idempotent

@@ -200,6 +200,12 @@ The `context` field was added in migration 009 and is supported in `LinkRepo.cre
 
 10. **MUST** use `exobrain update <id> --space <name>` via CLI (`engine/src/cli/main.py`, line 496) or edit the `space` field in a projected file and run `exobrain sync` to move objects between spaces. Both paths are valid. The `id` field remains permanently immutable in all contexts.
 
+11. **MUST** link provenance when creating content in idea spaces. When generating views, documents, or responses within an idea space, always link the new object back to its sources:
+    - Use `derived-from` for transcripts and concepts the content was generated from.
+    - Use `references` for specific objects the content cites or builds upon.
+    - This applies both inside commands (e.g., `/generate-view`) and in ad-hoc creation.
+    - Example: `exobrain link create <new-id> <source-transcript-id> "derived-from" --json`
+
 ## References
 
 - ADR-002: `docs/adr/002-sqlite-core-memory-layer.md` (data model, schema, space hierarchy convention)
