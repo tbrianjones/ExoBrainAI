@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ExoBrain{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com/3.4.17?plugins=typography"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                typography: {
+                    DEFAULT: {
+                        css: {
+                            a: { color: '#2563eb', '&:hover': { color: '#1d4ed8' } },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    </script>
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
     <link rel="stylesheet" href="/static/style.css">
 </head>

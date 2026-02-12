@@ -3,6 +3,7 @@
 import html
 import re
 import secrets
+from datetime import datetime, timezone
 
 import nh3
 from fastapi import APIRouter, Request
@@ -77,13 +78,66 @@ def _convert_wikilinks(html_text: str) -> str:
     return _WIKILINK_RE.sub(_replace, html_text)
 
 
+_BARE_URL_RE = re.compile(r'https?://[^\s<>"\']+')
+_EXTERNAL_LINK_RE = re.compile(r'<a\s+href="(https?://[^"]*)"([^>]*)>')
+_SKIP_TAGS = frozenset({"a", "code", "pre"})
+
+
+def _linkify_url(m: re.Match) -> str:
+    """Wrap a bare URL match in an <a> tag opening in a new window."""
+    url = m.group(0)
+    trailing = ""
+    while url and url[-1] in ".,;:!?)":
+        trailing = url[-1] + trailing
+        url = url[:-1]
+    safe_url = html.escape(url, quote=True)
+    display = html.escape(url)
+    return (
+        f'<a href="{safe_url}" target="_blank" rel="noopener noreferrer">'
+        f"{display}</a>{trailing}"
+    )
+
+
+def _auto_link_urls(html_text: str) -> str:
+    """Convert bare URLs in text to clickable links. Skips URLs inside <a>, <code>, <pre>."""
+    parts = re.split(r"(<[^>]+>)", html_text)
+    skip_depth = 0
+    result = []
+    for part in parts:
+        if part.startswith("<"):
+            tag_match = re.match(r"</?(\w+)", part)
+            if tag_match and tag_match.group(1).lower() in _SKIP_TAGS:
+                if part[1] == "/":
+                    skip_depth = max(0, skip_depth - 1)
+                else:
+                    skip_depth += 1
+            result.append(part)
+        elif skip_depth > 0:
+            result.append(part)
+        else:
+            result.append(_BARE_URL_RE.sub(_linkify_url, part))
+    return "".join(result)
+
+
+def _externalize_links(html_text: str) -> str:
+    """Add target='_blank' rel='noopener noreferrer' to external (http/https) links."""
+    def _add_target(m: re.Match) -> str:
+        rest = m.group(2)
+        if "target=" in rest:
+            return m.group(0)
+        return f'<a href="{m.group(1)}"{rest} target="_blank" rel="noopener noreferrer">'
+    return _EXTERNAL_LINK_RE.sub(_add_target, html_text)
+
+
 def _render_markdown(content: str) -> str:
     """Render markdown to sanitized HTML, stripping any YAML frontmatter."""
     import markdown as md
     clean = _strip_frontmatter(content)
     raw_html = md.markdown(clean, extensions=["fenced_code", "tables"], tab_length=2)
     sanitized = _sanitize_html(raw_html)
-    return _convert_wikilinks(sanitized)
+    with_wikilinks = _convert_wikilinks(sanitized)
+    with_urls = _auto_link_urls(with_wikilinks)
+    return _externalize_links(with_urls)
 
 
 def _generate_csrf_token() -> str:
@@ -234,6 +288,58 @@ async def object_detail(request: Request, obj_id: str):
     return response
 
 
+def _load_object_metadata(conn, obj_id: str) -> dict | None:
+    """Load an object with all metadata (tags, links, versions) for download."""
+    obj_repo = ObjectRepo(conn)
+    tag_repo = TagRepo(conn)
+    link_repo = LinkRepo(conn)
+
+    obj = obj_repo.get(obj_id)
+    if obj is None:
+        obj = obj_repo.get_by_prefix(obj_id)
+    if obj is None:
+        return None
+
+    obj["tags"] = tag_repo.list_for_object(obj["id"])
+    obj["links"] = link_repo.list_all_for(obj["id"])
+    obj["versions"] = obj_repo.list_history(obj["id"])
+    return obj
+
+
+def _build_metadata_markdown(obj: dict) -> str:
+    """Build markdown sections for links and version history."""
+    sections = []
+
+    # Links section
+    if obj["links"]:
+        sections.append("## Links")
+        sections.append("")
+        for link in obj["links"]:
+            direction = link.get("direction", "outgoing")
+            rel = link.get("effective_relationship", link.get("relationship", ""))
+            if direction == "outgoing":
+                target_title = link.get("to_title", link.get("to_id", ""))
+                target_id = link.get("to_id", "")
+            else:
+                target_title = link.get("from_title", link.get("from_id", ""))
+                target_id = link.get("from_id", "")
+            sections.append(f"- **{rel}**: {target_title} (`{target_id}`)")
+        sections.append("")
+
+    # Version history section
+    if obj["versions"]:
+        sections.append("## Version History")
+        sections.append("")
+        for ver in obj["versions"]:
+            v = ver.get("version", "")
+            changed = ver.get("created_at", "")[:16].replace("T", " ") if ver.get("created_at") else ""
+            vtitle = ver.get("title", "")
+            sections.append(f"- **v{v}** ({changed}): {vtitle}")
+        sections.append("")
+
+    return "\n".join(sections)
+
+
 @router.get("/objects/{obj_id}/download")
 async def object_download_markdown(request: Request, obj_id: str):
     """Download an object as a Markdown file with YAML frontmatter."""
@@ -242,16 +348,11 @@ async def object_download_markdown(request: Request, obj_id: str):
         return PlainTextResponse("Database not found", status_code=503)
 
     with db_session(db_path) as conn:
-        obj_repo = ObjectRepo(conn)
-        tag_repo = TagRepo(conn)
-
-        obj = obj_repo.get(obj_id)
-        if obj is None:
-            obj = obj_repo.get_by_prefix(obj_id)
+        obj = _load_object_metadata(conn, obj_id)
         if obj is None:
             return PlainTextResponse("Object not found", status_code=404)
 
-        tags = tag_repo.list_for_object(obj["id"])
+        tags = obj["tags"]
 
         # Build YAML frontmatter
         lines = ["---"]
@@ -274,12 +375,18 @@ async def object_download_markdown(request: Request, obj_id: str):
         if obj.get("content"):
             lines.append(obj["content"])
 
+        metadata_md = _build_metadata_markdown(obj)
+        if metadata_md:
+            lines.append("")
+            lines.append(metadata_md)
+
         md_content = "\n".join(lines)
 
-        # Slugify title for filename
+        # Build filename with version and download timestamp
         slug = re.sub(r"[^\w\s-]", "", obj.get("title", "object").lower())
         slug = re.sub(r"[\s]+", "-", slug).strip("-") or "object"
-        filename = f"{slug}.md"
+        now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        filename = f"{slug}_v{obj.get('version', 1)}_{now}.md"
 
         return PlainTextResponse(
             content=md_content,
@@ -298,16 +405,11 @@ async def object_download_pdf(request: Request, obj_id: str):
         return PlainTextResponse("Database not found", status_code=503)
 
     with db_session(db_path) as conn:
-        obj_repo = ObjectRepo(conn)
-        tag_repo = TagRepo(conn)
-
-        obj = obj_repo.get(obj_id)
-        if obj is None:
-            obj = obj_repo.get_by_prefix(obj_id)
+        obj = _load_object_metadata(conn, obj_id)
         if obj is None:
             return PlainTextResponse("Object not found", status_code=404)
 
-        tags = tag_repo.list_for_object(obj["id"])
+        tags = obj["tags"]
 
         # Build the content HTML from markdown
         content_html = ""
@@ -322,6 +424,32 @@ async def object_download_pdf(request: Request, obj_id: str):
             tag_html = " ".join(
                 f'<span class="tag">{html.escape(t)}</span>' for t in tags
             )
+
+        # Build links HTML as bullet list
+        links_html = ""
+        if obj["links"]:
+            links_html = '<div class="links"><h2>Links</h2><ul>'
+            for link in obj["links"]:
+                rel = html.escape(link.get("effective_relationship", link.get("relationship", "")))
+                if link.get("direction") == "outgoing":
+                    target_title = html.escape(link.get("to_title", link.get("to_id", "")))
+                    target_id = html.escape(link.get("to_id", ""))
+                else:
+                    target_title = html.escape(link.get("from_title", link.get("from_id", "")))
+                    target_id = html.escape(link.get("from_id", ""))
+                links_html += f"<li><strong>{rel}</strong>: {target_title} (<code>{target_id}</code>)</li>"
+            links_html += "</ul></div>"
+
+        # Build version history HTML as bullet list
+        versions_html = ""
+        if obj["versions"]:
+            versions_html = '<div class="versions"><h2>Version History</h2><ul>'
+            for ver in obj["versions"]:
+                v = html.escape(str(ver.get("version", "")))
+                changed = ver.get("created_at", "")[:16].replace("T", " ") if ver.get("created_at") else ""
+                vtitle = html.escape(ver.get("title", ""))
+                versions_html += f"<li><strong>v{v}</strong> ({html.escape(changed)}): {vtitle}</li>"
+            versions_html += "</ul></div>"
 
         # Standalone HTML document with inline styles
         pdf_html = f"""<!DOCTYPE html>
@@ -352,6 +480,12 @@ async def object_download_pdf(request: Request, obj_id: str):
   .content th {{ background: #f8f9fa; font-weight: 600; }}
   .content a {{ color: #2563eb; }}
   .content img {{ max-width: 100%; }}
+  .links {{ margin-top: 24px; font-size: 13px; }}
+  .links h2 {{ font-size: 16px; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }}
+  .links ul, .versions ul {{ padding-left: 20px; margin: 8px 0; }}
+  .links li, .versions li {{ margin-bottom: 4px; }}
+  .versions {{ margin-top: 24px; font-size: 13px; }}
+  .versions h2 {{ font-size: 16px; color: #374151; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }}
 </style></head><body>
 <div class="meta">
   <h1>{html.escape(obj.get('title', ''))}</h1>
@@ -367,14 +501,17 @@ async def object_download_pdf(request: Request, obj_id: str):
 <div class="content">
   {content_html}
 </div>
+{links_html}
+{versions_html}
 </body></html>"""
 
         pdf_bytes = HTML(string=pdf_html).write_pdf()
 
-        # Slugify title for filename
+        # Build filename with version and download timestamp
         slug = re.sub(r"[^\w\s-]", "", obj.get("title", "object").lower())
         slug = re.sub(r"[\s]+", "-", slug).strip("-") or "object"
-        filename = f"{slug}.pdf"
+        now = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        filename = f"{slug}_v{obj.get('version', 1)}_{now}.pdf"
 
         return Response(
             content=pdf_bytes,

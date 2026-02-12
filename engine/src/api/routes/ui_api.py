@@ -292,7 +292,7 @@ async def space_tree(request: Request, q: str = ""):
 # Object listing (HTMX partial)
 # ---------------------------------------------------------------------------
 
-_VALID_SORT_COLS = {"id", "type", "title", "created"}
+_VALID_SORT_COLS = {"id", "type", "title", "created", "updated"}
 
 # Hex chars + dashes that appear in UUIDs
 _UUID_CHARS = set("0123456789abcdef-")
@@ -315,6 +315,8 @@ async def list_objects(
     offset: int = 0,
     sort: str = "created",
     order: str = "desc",
+    date_from: str = "",
+    date_to: str = "",
 ):
     """Return object list as an HTML fragment."""
     templates = _templates(request)
@@ -389,6 +391,8 @@ async def list_objects(
                 include_system=include_system,
                 sort_by=sort,
                 sort_order=order,
+                date_from=date_from or None,
+                date_to=date_to or None,
             )
 
         # Batch fetch tags (avoids N+1 query)

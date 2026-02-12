@@ -9,9 +9,7 @@
     {% for v in versions | reverse %}
     <div class="border border-gray-200 rounded">
         <div class="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer"
-             hx-get="/ui-api/objects/{{ obj.id }}/diff/{{ v.version }}"
-             hx-target="#diff-{{ v.version }}"
-             hx-swap="innerHTML">
+             onclick="toggleDiff('{{ obj.id }}', '{{ v.version }}', this)">
             <div class="flex items-center gap-3 text-sm">
                 <span class="font-medium text-gray-700">v{{ v.version }}</span>
                 <span class="text-gray-400 text-xs font-mono">{{ v.created_at }}</span>
@@ -19,13 +17,37 @@
                 <span class="text-gray-400 text-xs">by {{ v.changed_by }}</span>
                 {% endif %}
             </div>
-            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
         </div>
-        <div id="diff-{{ v.version }}" class="border-t border-gray-100"></div>
+        <div id="diff-{{ v.version }}" class="border-t border-gray-100 hidden"></div>
     </div>
     {% endfor %}
+    <script>
+    function toggleDiff(objId, version, row) {
+        var el = document.getElementById('diff-' + version);
+        var arrow = row.querySelector('svg');
+        if (el.innerHTML.trim() === '') {
+            // First click: fetch the diff
+            fetch('/ui-api/objects/' + objId + '/diff/' + version)
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    el.innerHTML = html;
+                    el.classList.remove('hidden');
+                    arrow.style.transform = 'rotate(180deg)';
+                });
+        } else if (el.classList.contains('hidden')) {
+            // Already loaded, show it
+            el.classList.remove('hidden');
+            arrow.style.transform = 'rotate(180deg)';
+        } else {
+            // Visible, hide it
+            el.classList.add('hidden');
+            arrow.style.transform = '';
+        }
+    }
+    </script>
     {% else %}
     <p class="text-gray-400 text-sm">No previous versions</p>
     {% endif %}

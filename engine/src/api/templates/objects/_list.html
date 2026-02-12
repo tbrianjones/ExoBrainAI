@@ -2,12 +2,12 @@
     <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
-                {% for col, label in [('id', 'ID'), ('type', 'Type'), ('title', 'Title'), ('created', 'Created')] %}
+                {% for col, label in [('id', 'ID'), ('type', 'Type'), ('title', 'Title'), ('created', 'Created'), ('updated', 'Updated')] %}
                 <th class="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">
                     <button class="flex items-center gap-1 hover:text-gray-900 cursor-pointer"
                             hx-get="/ui-api/objects?offset=0"
                             hx-target="#object-list"
-                            hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order']"
+                            hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order'],[name='date_from'],[name='date_to']"
                             onclick="exoSort('{{ col }}')">
                         {{ label }}
                         {% if sort == col %}
@@ -37,6 +37,7 @@
                     </a>
                 </td>
                 <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ obj.created_at[:16].replace('T', ' ') if obj.created_at and obj.created_at|length > 10 else obj.created_at[:10] if obj.created_at else '' }}</td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ obj.updated_at[:16].replace('T', ' ') if obj.updated_at and obj.updated_at|length > 10 else obj.updated_at[:10] if obj.updated_at else '' }}</td>
                 <td class="px-4 py-2">
                     {% for tag in obj.tags %}
                     <span class="inline-block px-1.5 py-0.5 text-xs rounded bg-gray-100 text-gray-600 mr-1">{{ tag }}</span>
@@ -45,7 +46,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="5" class="px-4 py-8 text-center text-gray-500">No objects found.</td>
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">No objects found.</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -63,7 +64,7 @@
         <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
                 hx-get="/ui-api/objects?offset={{ [offset - limit, 0] | max }}&limit={{ limit }}&sort={{ sort }}&order={{ order }}"
                 hx-target="#object-list"
-                hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system']">
+                hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='date_from'],[name='date_to']">
             Previous
         </button>
         {% endif %}
@@ -71,7 +72,7 @@
         <button class="px-3 py-1 border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
                 hx-get="/ui-api/objects?offset={{ offset + limit }}&limit={{ limit }}&sort={{ sort }}&order={{ order }}"
                 hx-target="#object-list"
-                hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system']">
+                hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='date_from'],[name='date_to']">
             Next
         </button>
         {% endif %}

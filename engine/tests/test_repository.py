@@ -6,7 +6,7 @@ import sqlite3
 import pytest
 
 from src.core.bootstrap import BOOTSTRAP_IDS
-from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo
+from src.core.repository import FileRepo, LinkRepo, ObjectRepo, TagRepo, _normalize_created_at
 
 
 # ============================================================
@@ -1632,3 +1632,178 @@ class TestVerifyHashesExcludesPurged:
         # The purged object should no longer appear in hash verification
         mismatches_after = repo.verify_content_hashes()
         assert not any(m["id"] == obj_id for m in mismatches_after)
+
+
+# ============================================================
+# _normalize_created_at
+# ============================================================
+
+
+class TestNormalizeCreatedAt:
+    """Test _normalize_created_at helper."""
+
+    def test_date_only_gets_time_appended(self):
+        result = _normalize_created_at("2026-02-11")
+        assert result.startswith("2026-02-11T")
+        assert result.endswith(".000Z")
+        # Should have HH:MM:SS format
+        time_part = result[11:19]
+        assert len(time_part) == 8
+        assert time_part[2] == ":" and time_part[5] == ":"
+
+    def test_full_iso_timestamp_unchanged(self):
+        ts = "2026-02-11T14:30:00.000Z"
+        assert _normalize_created_at(ts) == ts
+
+    def test_datetime_without_millis_unchanged(self):
+        ts = "2026-02-11T14:30:00Z"
+        assert _normalize_created_at(ts) == ts
+
+    def test_partial_date_not_matched(self):
+        """Strings that look like dates but aren't exact YYYY-MM-DD should pass through."""
+        assert _normalize_created_at("2026-02") == "2026-02"
+        assert _normalize_created_at("not-a-date") == "not-a-date"
+
+    def test_create_with_date_only_stores_nonmidnight(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Date Only Test",
+            created_at="2026-02-11",
+        )
+        # Should not be midnight
+        assert obj["created_at"].startswith("2026-02-11T")
+        assert obj["created_at"] != "2026-02-11T00:00:00.000Z"
+
+    def test_create_with_full_timestamp_unchanged(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        ts = "2026-02-11T14:30:00.000Z"
+        obj = repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Full TS Test",
+            created_at=ts,
+        )
+        assert obj["created_at"] == ts
+
+
+# ============================================================
+# ObjectRepo.list() sort by updated
+# ============================================================
+
+
+class TestObjectRepoSortByUpdated:
+    """Test sorting by updated_at column."""
+
+    def test_list_sort_by_updated(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        results = repo.list(sort_by="updated", sort_order="desc")
+        assert len(results) >= 2
+        # All results should have updated_at
+        for r in results:
+            assert r["updated_at"] is not None
+
+    def test_list_sort_by_updated_asc(self, sample_objects):
+        conn = sample_objects["conn"]
+        repo = ObjectRepo(conn)
+        results = repo.list(sort_by="updated", sort_order="asc")
+        # updated_at should be in ascending order
+        timestamps = [r["updated_at"] for r in results]
+        assert timestamps == sorted(timestamps)
+
+
+# ============================================================
+# ObjectRepo.list() date range filter
+# ============================================================
+
+
+class TestObjectRepoDateRangeFilter:
+    """Test date_from and date_to filters on list()."""
+
+    def test_date_from_filters_older(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        # Create objects on different dates
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Old Object",
+            created_at="2025-01-01T12:00:00.000Z",
+        )
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="New Object",
+            created_at="2026-02-10T12:00:00.000Z",
+        )
+        bootstrapped_db.commit()
+
+        results = repo.list(date_from="2026-01-01")
+        titles = [r["title"] for r in results]
+        assert "New Object" in titles
+        assert "Old Object" not in titles
+
+    def test_date_to_filters_newer(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Old Object",
+            created_at="2025-01-01T12:00:00.000Z",
+        )
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="New Object",
+            created_at="2026-02-10T12:00:00.000Z",
+        )
+        bootstrapped_db.commit()
+
+        results = repo.list(date_to="2025-12-31")
+        titles = [r["title"] for r in results]
+        assert "Old Object" in titles
+        assert "New Object" not in titles
+
+    def test_date_to_is_inclusive(self, bootstrapped_db):
+        """date_to uses < date(?, '+1 day') so the specified date is included."""
+        repo = ObjectRepo(bootstrapped_db)
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Same Day Object",
+            created_at="2026-02-10T18:00:00.000Z",
+        )
+        bootstrapped_db.commit()
+
+        results = repo.list(date_to="2026-02-10")
+        titles = [r["title"] for r in results]
+        assert "Same Day Object" in titles
+
+    def test_date_range_both_bounds(self, bootstrapped_db):
+        repo = ObjectRepo(bootstrapped_db)
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="Before Range",
+            created_at="2025-01-01T12:00:00.000Z",
+        )
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="In Range",
+            created_at="2025-06-15T12:00:00.000Z",
+        )
+        repo.create(
+            type_id=BOOTSTRAP_IDS["document"],
+            space_id=BOOTSTRAP_IDS["primitives"],
+            title="After Range",
+            created_at="2026-02-10T12:00:00.000Z",
+        )
+        bootstrapped_db.commit()
+
+        results = repo.list(date_from="2025-03-01", date_to="2025-12-31")
+        titles = [r["title"] for r in results]
+        assert "In Range" in titles
+        assert "Before Range" not in titles
+        assert "After Range" not in titles

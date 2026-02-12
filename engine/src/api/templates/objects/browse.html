@@ -20,7 +20,7 @@
                    hx-get="/ui-api/objects"
                    hx-trigger="keyup changed delay:300ms"
                    hx-target="#object-list"
-                   hx-include="[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order']">
+                   hx-include="[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order'],[name='date_from'],[name='date_to']">
         </div>
         <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">Type</label>
@@ -29,7 +29,7 @@
                     hx-get="/ui-api/objects"
                     hx-trigger="change"
                     hx-target="#object-list"
-                    hx-include="[name='q'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order']">
+                    hx-include="[name='q'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order'],[name='date_from'],[name='date_to']">
                 <option value="">All types</option>
                 {% for t in types %}
                 <option value="{{ t.title }}" {% if selected_type == t.title %}selected{% endif %}>{{ t.title }}</option>
@@ -43,7 +43,7 @@
                     hx-get="/ui-api/objects"
                     hx-trigger="change"
                     hx-target="#object-list"
-                    hx-include="[name='q'],[name='type'],[name='tag'],[name='system'],[name='sort'],[name='order']">
+                    hx-include="[name='q'],[name='type'],[name='tag'],[name='system'],[name='sort'],[name='order'],[name='date_from'],[name='date_to']">
                 <option value="">All spaces</option>
                 {% for s in spaces %}
                 <option value="{{ s.title }}" {% if selected_space == s.title %}selected{% endif %}>{{ s.title }}</option>
@@ -57,12 +57,30 @@
                     hx-get="/ui-api/objects"
                     hx-trigger="change"
                     hx-target="#object-list"
-                    hx-include="[name='q'],[name='type'],[name='space'],[name='system'],[name='sort'],[name='order']">
+                    hx-include="[name='q'],[name='type'],[name='space'],[name='system'],[name='sort'],[name='order'],[name='date_from'],[name='date_to']">
                 <option value="">All tags</option>
                 {% for t in tags %}
                 <option value="{{ t.tag_text }}" {% if selected_tag == t.tag_text %}selected{% endif %}>{{ t.tag_text }} ({{ t.count }})</option>
                 {% endfor %}
             </select>
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">From</label>
+            <input type="date" name="date_from"
+                   class="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   hx-get="/ui-api/objects"
+                   hx-trigger="change"
+                   hx-target="#object-list"
+                   hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order'],[name='date_to']">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">To</label>
+            <input type="date" name="date_to"
+                   class="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                   hx-get="/ui-api/objects"
+                   hx-trigger="change"
+                   hx-target="#object-list"
+                   hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='system'],[name='sort'],[name='order'],[name='date_from']">
         </div>
         <div class="flex items-center pt-4">
             <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
@@ -71,7 +89,7 @@
                        hx-get="/ui-api/objects"
                        hx-trigger="change"
                        hx-target="#object-list"
-                       hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='sort'],[name='order']">
+                       hx-include="[name='q'],[name='type'],[name='space'],[name='tag'],[name='sort'],[name='order'],[name='date_from'],[name='date_to']">
                 System objects
             </label>
         </div>
@@ -79,14 +97,14 @@
 </div>
 
 <!-- Hidden sort state -->
-<input type="hidden" name="sort" id="sort-field" value="created">
+<input type="hidden" name="sort" id="sort-field" value="updated">
 <input type="hidden" name="order" id="order-field" value="desc">
 
 <!-- Object list -->
 <div id="object-list"
      hx-get="/ui-api/objects{% if selected_tag %}?tag={{ selected_tag|urlencode }}{% elif selected_space %}?space={{ selected_space|urlencode }}{% elif selected_type %}?type={{ selected_type|urlencode }}{% endif %}"
      hx-trigger="load"
-     hx-include="[name='sort'],[name='order']"
+     hx-include="[name='sort'],[name='order'],[name='date_from'],[name='date_to']"
      hx-swap="innerHTML">
     <div class="text-gray-500 text-sm">Loading objects...</div>
 </div>
@@ -99,7 +117,7 @@ function exoSort(col) {
         of.value = of.value === 'asc' ? 'desc' : 'asc';
     } else {
         sf.value = col;
-        of.value = col === 'created' ? 'desc' : 'asc';
+        of.value = (col === 'created' || col === 'updated') ? 'desc' : 'asc';
     }
 }
 </script>

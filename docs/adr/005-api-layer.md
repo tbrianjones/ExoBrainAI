@@ -57,6 +57,7 @@ The CLI is the sole supported interface for v0. Claude Code invokes the CLI thro
 
 - **Stale API code**: The existing API code will drift from the CLI as the core engine evolves; when the API is eventually activated, it will need updating
 - **No remote access**: ExoBrain cannot be accessed from other machines or services without the API (acceptable for a single-user, local-first system)
+- **No authentication**: The API has no authentication by design. ExoBrain is a single-user, local-only system; the API should not be exposed to untrusted networks
 - **Potential rework**: If a consumer appears soon, some work will need to be redone that could have been done incrementally
 
 ### Neutral

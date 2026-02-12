@@ -7,12 +7,25 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
+import re
 import shutil
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.config import settings
 from src.core.models import generate_id
+
+
+_DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _normalize_created_at(value: str) -> str:
+    """If date-only, append current UTC time to avoid midnight sorting."""
+    if _DATE_ONLY_RE.match(value):
+        now = datetime.now(timezone.utc)
+        return f"{value}T{now.strftime('%H:%M:%S')}.000Z"
+    return value
 
 
 def _escape_like(value: str) -> str:
@@ -34,6 +47,7 @@ _SORT_COLUMNS = {
     "type": "t.title",
     "title": "o.title",
     "created": "o.created_at",
+    "updated": "o.updated_at",
 }
 
 
@@ -65,6 +79,7 @@ class ObjectRepo:
         obj_id = id or generate_id()
         content_hash = compute_content_hash(title, summary, content)
         if created_at:
+            created_at = _normalize_created_at(created_at)
             self.conn.execute(
                 """INSERT INTO objects (id, type_id, space_id, title, summary, content, source, content_hash, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -153,6 +168,8 @@ class ObjectRepo:
         include_deleted: bool = False,
         sort_by: str = "created",
         sort_order: str = "desc",
+        date_from: str | None = None,
+        date_to: str | None = None,
     ) -> list[dict]:
         """List objects with optional filters."""
         query = """
@@ -199,6 +216,13 @@ class ObjectRepo:
             query += " JOIN object_tags ot ON o.id = ot.object_id"
             conditions.append("ot.tag_text = ?")
             params.append(tag)
+
+        if date_from:
+            conditions.append("o.created_at >= ?")
+            params.append(date_from)
+        if date_to:
+            conditions.append("o.created_at < date(?, '+1 day')")
+            params.append(date_to)
 
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
