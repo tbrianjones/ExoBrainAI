@@ -639,10 +639,12 @@ class ObjectRepo:
         space_type_id = BOOTSTRAP_IDS["space"]
 
         # Query 1: Direct counts and last activity per space
+        # last_activity includes the space object's own updated_at
         rows = self.conn.execute(
             """SELECT s.id as space_id, s.title as space_name,
+                      s.created_at as space_created_at,
                       COUNT(o.id) as direct_count,
-                      MAX(o.updated_at) as last_activity
+                      MAX(COALESCE(MAX(o.updated_at), s.updated_at), s.updated_at) as last_activity
                FROM objects s
                LEFT JOIN objects o ON o.space_id = s.id
                    AND o.type_id != :space_type_id

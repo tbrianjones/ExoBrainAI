@@ -255,3 +255,4 @@ ADRs document key architectural choices. Read these before making significant ch
 - Always do work in feature branches. Propose this as soon as you launch.
 - **Infrastructure as code.** Never configure infrastructure manually. All configuration in repository files, version controlled, deployed via push.
 - **Pre-migration backups.** Always run `exobrain backup` before applying schema migrations or making architectural database changes.
+- **Rebuild after UI changes.** The web UI runs inside Docker. After any changes to templates, routes, static assets, or Python code, run `docker compose up -d --build` before presenting results to the user for testing.

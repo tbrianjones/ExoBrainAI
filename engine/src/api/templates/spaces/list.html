@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Spaces ; ExoBrain{% endblock %}
+{% block content %}
+<h2 class="text-2xl font-bold text-gray-900 mb-6">Spaces</h2>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Total Spaces</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ total_spaces }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Top-Level Spaces</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ top_level_count }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Deepest Nesting</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ max_depth }}</div>
+    </div>
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <div class="text-sm font-medium text-gray-500">Objects in Spaces</div>
+        <div class="text-2xl font-bold text-gray-900 mt-1">{{ total_objects_in_spaces }}</div>
+    </div>
+</div>
+
+<!-- Tab nav -->
+<div class="border-b border-gray-200 mb-6">
+    <nav class="flex gap-4">
+        <span class="px-3 py-2 text-sm font-medium text-blue-600 border-b-2 border-blue-600">List</span>
+        <a href="/ui/spaces/hierarchy" class="px-3 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 border-b-2 border-transparent hover:border-gray-300">Hierarchy</a>
+    </nav>
+</div>
+
+<!-- Filter toolbar -->
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+    <div class="flex flex-wrap items-end gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-medium text-gray-500 mb-1">Search</label>
+            <input type="text" name="q" placeholder="Filter spaces..."
+                   class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                   hx-get="/ui-api/spaces/list"
+                   hx-trigger="keyup changed delay:300ms"
+                   hx-target="#space-list"
+                   hx-include="[name='sort'],[name='order'],[name='depth'],[name='show_empty']">
+        </div>
+        <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Depth</label>
+            <select name="depth"
+                    class="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    hx-get="/ui-api/spaces/list"
+                    hx-trigger="change"
+                    hx-target="#space-list"
+                    hx-include="[name='q'],[name='sort'],[name='order'],[name='show_empty']">
+                <option value="all">All levels</option>
+                <option value="top">Top-level only</option>
+                <option value="2">2 levels deep</option>
+                <option value="3+">3+ levels deep</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-2">
+            <input type="checkbox" name="show_empty" id="show-empty" value="1" checked
+                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                   hx-get="/ui-api/spaces/list"
+                   hx-trigger="change"
+                   hx-target="#space-list"
+                   hx-include="[name='q'],[name='sort'],[name='order'],[name='depth']">
+            <label for="show-empty" class="text-xs font-medium text-gray-500">Show empty</label>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden sort state -->
+<input type="hidden" name="sort" id="sort-field" value="last_activity">
+<input type="hidden" name="order" id="order-field" value="desc">
+
+<!-- Space list -->
+<div id="space-list"
+     hx-get="/ui-api/spaces/list"
+     hx-trigger="load"
+     hx-include="[name='sort'],[name='order'],[name='depth'],[name='show_empty']"
+     hx-swap="innerHTML">
+    <div class="text-gray-500 text-sm">Loading spaces...</div>
+</div>
+
+<script>
+function exoSort(col) {
+    var sf = document.getElementById('sort-field');
+    var of = document.getElementById('order-field');
+    if (sf.value === col) {
+        of.value = of.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sf.value = col;
+        of.value = col === 'name' ? 'asc' : 'desc';
+    }
+}
+</script>
+{% endblock %}

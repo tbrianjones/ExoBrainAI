@@ -55,6 +55,18 @@
                         <span class="w-5 text-center mr-2 text-gray-500">&#9776;</span>
                         Spaces
                     </a>
+                    <ul class="ml-7 space-y-0.5">
+                        <li>
+                            <a href="/ui/spaces" class="flex items-center px-4 py-1.5 text-xs hover:bg-gray-800 hover:text-white {% if active_subpage == 'spaces_list' %}text-white{% else %}text-gray-500{% endif %}">
+                                List
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/ui/spaces/hierarchy" class="flex items-center px-4 py-1.5 text-xs hover:bg-gray-800 hover:text-white {% if active_subpage == 'spaces_hierarchy' %}text-white{% else %}text-gray-500{% endif %}">
+                                Hierarchy
+                            </a>
+                        </li>
+                    </ul>
                 </li>
                 <li>
                     <a href="/ui/files" class="flex items-center px-4 py-2 hover:bg-gray-800 hover:text-white {% if active_page == 'files' %}bg-gray-800 text-white{% endif %}">

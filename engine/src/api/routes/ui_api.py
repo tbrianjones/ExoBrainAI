@@ -266,6 +266,84 @@ def _build_space_tree(space_stats: list[dict], search: str = "") -> list[dict]:
     return root_nodes
 
 
+_VALID_SPACE_SORT_COLS = {"name", "last_activity", "created", "objects"}
+
+
+@router.get("/spaces/list", response_class=HTMLResponse)
+async def list_spaces(
+    request: Request,
+    q: str = "",
+    sort: str = "last_activity",
+    order: str = "desc",
+    depth: str = "all",
+    show_empty: str = "1",
+    limit: int = 50,
+    offset: int = 0,
+):
+    """Return space list as an HTML fragment."""
+    templates = _templates(request)
+
+    limit = min(max(1, limit), MAX_LIMIT)
+    offset = max(0, offset)
+
+    if sort not in _VALID_SPACE_SORT_COLS:
+        sort = "last_activity"
+    if order not in ("asc", "desc"):
+        order = "desc"
+
+    db_path = get_db_path()
+    if not db_path.exists():
+        return HTMLResponse("<div class='text-red-600'>Database not found.</div>")
+
+    with db_session(db_path) as conn:
+        obj_repo = ObjectRepo(conn)
+        all_spaces = obj_repo.space_stats()
+
+    # Filter by search
+    if q.strip():
+        q_lower = q.strip().lower()
+        all_spaces = [s for s in all_spaces if q_lower in s["space_name"].lower()]
+
+    # Filter by depth
+    if depth == "top":
+        all_spaces = [s for s in all_spaces if "/" not in s["space_name"]]
+    elif depth == "2":
+        all_spaces = [s for s in all_spaces if s["space_name"].count("/") == 1]
+    elif depth == "3+":
+        all_spaces = [s for s in all_spaces if s["space_name"].count("/") >= 2]
+
+    # Filter empty spaces
+    if show_empty != "1":
+        all_spaces = [s for s in all_spaces if s["direct_count"] > 0]
+
+    total = len(all_spaces)
+
+    # Sort
+    reverse = order == "desc"
+    if sort == "name":
+        all_spaces.sort(key=lambda s: s["space_name"].lower(), reverse=reverse)
+    elif sort == "last_activity":
+        all_spaces.sort(key=lambda s: s.get("last_activity") or "", reverse=reverse)
+    elif sort == "created":
+        all_spaces.sort(key=lambda s: s.get("space_created_at") or "", reverse=reverse)
+    elif sort == "objects":
+        all_spaces.sort(key=lambda s: s["direct_count"], reverse=reverse)
+
+    # Paginate
+    page = all_spaces[offset:offset + limit]
+
+    ctx = {
+        "request": request,
+        "spaces": page,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "sort": sort,
+        "order": order,
+    }
+    return templates.TemplateResponse("spaces/_list_fragment.html", ctx)
+
+
 @router.get("/spaces/tree", response_class=HTMLResponse)
 async def space_tree(request: Request, q: str = ""):
     """Return space tree as an HTML fragment."""

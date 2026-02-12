@@ -129,5 +129,6 @@ Step-by-step checklist for adding a new page to the ExoBrain web UI. Use when us
 - MUST render markdown server-side; no client-side rendering
 - MUST keep all UI routes under `/ui/` prefix and HTMX endpoints under `/ui-api/`
 - MUST NOT add write operations to the UI without a new ADR
+- MUST rebuild the Docker container (`docker compose up -d --build`) after any web UI changes (templates, routes, static assets, Python code) before presenting results to the user for testing. The web UI runs inside the container; local file edits are not live until rebuilt.
 - SHOULD use HTMX for dynamic updates instead of writing JavaScript
 - SHOULD reuse existing repository methods; new repository methods for enriched data are acceptable when existing methods lack sufficient data

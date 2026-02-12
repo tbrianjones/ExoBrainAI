@@ -77,8 +77,8 @@
                     <span class="text-xs text-gray-500">+{{ tag.spaces|length - 3 }} more</span>
                     {% endif %}
                 </td>
-                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ tag.first_used[:10] }}</td>
-                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ tag.last_used[:10] }}</td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ tag.first_used[:16].replace('T', ' ') if tag.first_used and tag.first_used|length > 10 else tag.first_used[:10] if tag.first_used else '' }}</td>
+                <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">{{ tag.last_used[:16].replace('T', ' ') if tag.last_used and tag.last_used|length > 10 else tag.last_used[:10] if tag.last_used else '' }}</td>
             </tr>
             {% else %}
             <tr>

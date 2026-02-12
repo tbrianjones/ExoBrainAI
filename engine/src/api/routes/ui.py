@@ -582,34 +582,55 @@ async def tags_browse(request: Request):
     return response
 
 
+def _compute_space_summary(space_stats: list[dict]) -> dict:
+    """Compute summary stats from space_stats for summary cards."""
+    total_spaces = len(space_stats)
+    top_level = [s for s in space_stats if "/" not in s["space_name"]]
+    max_depth = 0
+    for s in space_stats:
+        depth = s["space_name"].count("/")
+        if depth > max_depth:
+            max_depth = depth
+    return {
+        "total_spaces": total_spaces,
+        "top_level_count": len(top_level),
+        "max_depth": max_depth + 1,  # depth 0 = level 1
+        "total_objects_in_spaces": sum(s["direct_count"] for s in space_stats),
+    }
+
+
 @router.get("/spaces", response_class=HTMLResponse)
-async def spaces_explorer(request: Request):
-    """Space explorer page with hierarchical tree."""
+async def spaces_list(request: Request):
+    """Space list page with flat sortable table."""
     templates = _templates(request)
     ctx = _base_context(request, "spaces")
+    ctx["active_subpage"] = "spaces_list"
 
     db_path = get_db_path()
     if db_path.exists():
         with db_session(db_path) as conn:
             obj_repo = ObjectRepo(conn)
             space_stats = obj_repo.space_stats()
-
-            # Summary stats
-            ctx["total_spaces"] = len(space_stats)
-            top_level = [s for s in space_stats if "/" not in s["space_name"]]
-            ctx["top_level_count"] = len(top_level)
-            max_depth = 0
-            for s in space_stats:
-                depth = s["space_name"].count("/")
-                if depth > max_depth:
-                    max_depth = depth
-            ctx["max_depth"] = max_depth + 1  # depth 0 = level 1
-            ctx["total_objects_in_spaces"] = sum(s["direct_count"] for s in space_stats)
+            ctx.update(_compute_space_summary(space_stats))
     else:
         ctx["total_spaces"] = 0
         ctx["top_level_count"] = 0
         ctx["max_depth"] = 0
         ctx["total_objects_in_spaces"] = 0
+
+    csrf_token = _generate_csrf_token()
+    ctx["csrf_token"] = csrf_token
+    response = templates.TemplateResponse("spaces/list.html", ctx)
+    response.set_cookie("csrf_token", csrf_token, httponly=False, samesite="strict", path="/")
+    return response
+
+
+@router.get("/spaces/hierarchy", response_class=HTMLResponse)
+async def spaces_hierarchy(request: Request):
+    """Space hierarchy page with tree view."""
+    templates = _templates(request)
+    ctx = _base_context(request, "spaces")
+    ctx["active_subpage"] = "spaces_hierarchy"
 
     csrf_token = _generate_csrf_token()
     ctx["csrf_token"] = csrf_token
