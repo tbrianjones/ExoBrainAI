@@ -1,0 +1,443 @@
+---
+title: "Research Engineering: Bringing Software Development Practices to PhD-Level Neuroscience Research"
+description: "What if research papers were software? Mapping TDD, CI/CD, and AI-assisted tooling onto the reproducibility crisis in science."
+author: "T. Brian Jones"
+date: "2026-03-08"
+categories: [research-engineering, reproducibility, ai-tools, claude-code, neuroscience]
+---
+
+*A preliminary exploration for a clinical neuroscientist already using Docker and VS Code, looking to level up their research workflow with AI-assisted tooling.*
+
+## Executive Summary
+
+Software engineering has solved problems that science is still struggling with. When a developer writes code, two things happen automatically: the code must run (if it's broken, it crashes immediately), and a suite of tests verifies it produces correct results. Research has neither of these. A paper with a mathematically impossible statistic still gets published. An analysis that produces different results on a different machine still gets cited. The only verification layer is peer review; slow, inconsistent, and applied after the work is done rather than during it.
+
+The tools to fix this already exist. They're just scattered and unadopted. Docker containers guarantee environment reproducibility. Data validation libraries (Pandera, TDDA) act as "unit tests" for datasets. Executable manuscripts (Quarto) make the paper compute its own results; if the prose contradicts the data, the build fails. Continuous integration re-runs your entire analysis on every change. And AI assistants (Claude Code), configured with methodology guardrails and specialist agents, can provide structured peer review on demand in minutes, run Socratic pre-registration interviews, and enforce statistical best practices automatically.
+
+This document maps each software engineering concept to its research equivalent, identifies the tools available today, and proposes a project structure that integrates all of these into a single reproducible, testable, AI-augmented research workflow. The end state: a research project where reproducibility is guaranteed by construction, every established finding is formalized as an executable test, and AI assistants operate within your methodological rules; not because you remember to tell them, but because the rules are encoded in the project itself.
+
+## Contents
+
+1. **The Problem You Already Know About** ; The reproducibility crisis in neuroscience, by the numbers
+2. **Two Things Software Has That Research Doesn't** ; Intrinsic verification (code must run) and extrinsic verification (tests wrap code)
+3. **What If Research Papers Were Software?** ; Mapping TDD, unit tests, regression tests, and CI/CD to research
+4. **The Tools You Should Know About** ; Quarto, Pandera, Code Ocean, Elicit, Statcheck, and more
+5. **What Your Research Repo Could Look Like** ; Full project structure with tests, CI, and executable manuscripts
+6. **The `.claude/` Ecosystem: Your AI Research Team** ; Agents (virtual specialists), Commands (repeatable workflows), Skills (institutional knowledge), and AGENTS.md (methodology guardrails)
+7. **The AI Layer: Where This Gets Interesting** ; Socratic pre-registration, AI-assisted review, tests as thinking tools
+8. **Next Steps** ; Working session, starting points, key papers
+9. **The Vision** ; What research looks like when papers are programs
+
+## The Problem You Already Know About
+
+Neuroscience has a reproducibility problem. Not a theoretical one; a measured one:
+
+- **Median statistical power across neuroscience studies is 21%** (Button et al., Nature Reviews Neuroscience, 2013). Most studies are underpowered by design.
+- **70 independent research teams analyzed the same fMRI dataset** using different analytical pipelines and produced materially different conclusions (Botvinik-Nezer et al., Nature, 2020). The analysis "worked" for all 70 teams. At least 69 got a wrong answer.
+- **70% of researchers** have tried and failed to reproduce another scientist's experiments. Over 50% have failed to reproduce their own (Baker, Nature, 2016; survey of 1,576 scientists).
+- A 2024 meta-analysis of 75,000 studies estimated **1 in 7 results may have been partially fabricated** (Northwestern IPR).
+
+You already care about this; you publish Docker images alongside your papers so others can reproduce your work. That puts you ahead of most researchers. But Docker is necessary and nowhere near sufficient. It solves "I can't install your dependencies" but not "your analysis silently produces different results with slightly different data" or "there's a statistical error in Table 3 that nobody caught for two years."
+
+## Two Things Software Has That Research Doesn't
+
+Software development has two automated verification layers that research currently lacks:
+
+### Layer 1: The Code Must Run (Intrinsic Verification)
+
+If software is written incorrectly, it breaks. Visibly. Immediately. A syntax error, a type mismatch, a null pointer; the program crashes and tells you where. There is an unforgiving, instant feedback loop between writing code and knowing if it works.
+
+Research papers have no equivalent. A paper with an impossible mean (sample size of 30 but a reported mean of 4.57; which cannot be produced by dividing any integer by 30) still gets published. The GRIM test (Granularity-Related Inconsistency of Means) found that **~50% of psychology papers** contain at least one mathematically impossible reported mean. The paper "compiled" fine. Nobody noticed.
+
+### Layer 2: Tests Wrap the Code (Extrinsic Verification)
+
+Beyond just running, software engineers write *tests*; automated checks that verify the code produces correct results under known conditions. Unit tests check individual functions. Integration tests check that components work together. Regression tests ensure that changes don't break things that used to work.
+
+When an AI agent works in a well-tested codebase, the tests act as **guardrails that constrain the space of acceptable changes**. The agent can try things, but if it breaks a test, it knows immediately and corrects course. Tests don't just verify; they *guide*.
+
+Research has no equivalent. There is no automated layer between "I wrote this analysis" and "a peer reviewer looks at it months later." The peer reviewer is the only gate; and Stanford's Agentic Reviewer research showed that two human reviewers agree with each other only **41% of the time** (Spearman correlation of 0.41).
+
+## What If Research Papers Were Software?
+
+This is the radical reframing: **a research paper is a program that transforms data into conclusions.** If you treat it that way, every software engineering practice becomes applicable.
+
+Here's what that looks like concretely:
+
+### Pre-registration = Test-Driven Development
+
+In Test-Driven Development (TDD), you write the test *before* you write the code. The test defines what "correct" means before you try to produce it. This prevents you from unconsciously writing the code to match your expectations; the test was locked in first.
+
+Pre-registration is exactly this for research. You specify your hypotheses, methods, and analysis plan *before* collecting data. This prevents HARKing (Hypothesizing After Results are Known); the research equivalent of writing tests after the code works and pretending you knew what would happen.
+
+The parallel has been noted by multiple authors (Nosek et al., PNAS, 2018: "The preregistration revolution"), but it's deeper than most realize. In TDD, when a test fails, you learn something; either your code is wrong or your test was wrong. In pre-registered research, when your hypothesis fails, you learn something; either your theory is wrong or your methodology was wrong. Both are valuable. Both are suppressed when you skip the "write the test first" step.
+
+### Data Validation = Unit Tests
+
+Tools already exist to write testable assertions about your data:
+
+- **Pandera** ; Define schema objects with column-level checks and even statistical hypothesis tests (t-tests, chi-square) that run automatically during data validation. Designed explicitly for "scientists, engineers, and analysts seeking correctness."
+- **TDDA (Test-Driven Data Analysis)** ; Automatically *discovers* constraints from your data (allowed ranges, uniqueness, nullability, types) and stores them as a test suite. When new data arrives, it validates against those constraints.
+- **Great Expectations** ; Write human-readable "expectations" about your data ("I expect the age column to be between 0 and 120") that run as automated checks.
+
+Imagine writing assertions like: "Patient ages must be 0-120," "No null patient IDs," "Treatment group sizes must be within 10% of each other," "This column must follow a normal distribution with p > 0.05." Every time your pipeline runs, those assertions execute. If the data violates them, the pipeline stops and tells you what's wrong.
+
+### Property-Based Testing = Statistical Invariant Checking
+
+The Python library **Hypothesis** generates thousands of random inputs to stress-test your analysis functions for edge cases. It already found real bugs in NumPy and Astropy; float overflow, underflow, and precision errors that affected scientific calculations. Both projects adopted it.
+
+For neuroscience, this means: instead of testing your analysis function with one carefully chosen example, you test it with thousands of randomly generated datasets that satisfy your constraints. Does your analysis handle missing data correctly? What about extreme outliers? What about the edge case where two groups have identical means?
+
+### Regression Tests = "Does My Notebook Still Produce Figure 3?"
+
+**nbval** is a pytest plugin that re-executes Jupyter notebook cells and compares current outputs against saved outputs. If your notebook produces a different result than last time, the test fails. This catches silent changes; a dependency update that changes a default parameter, a data preprocessing step that was accidentally modified, a random seed that wasn't pinned.
+
+### Continuous Integration = Continuous Analysis
+
+Beaulieu-Jones and Greene published "Reproducibility of computational workflows is automated using continuous analysis" in *Nature Biotechnology* (2017). The concept: combine Docker with CI services (GitHub Actions) so that **every time you push a code or data change, the entire analysis re-runs automatically**. If the results change unexpectedly, the build fails.
+
+This is the "code must compile" equivalent for research. Your analysis either reproduces or it doesn't. Every time. Automatically.
+
+## The Tools You Should Know About
+
+### For Writing Executable Research Documents
+
+- **Quarto** (quarto.dev) ; The successor to R Markdown. Write documents that contain both prose and executable code (Python, R, Julia). The document *is* the analysis. When you write "p = 0.03" in your paper, that value is computed live from the data. If the data changes, the number updates. If the prose contradicts the computation, you see it immediately. Outputs to PDF, HTML, Word, and presentation formats.
+- **Jupyter Notebooks** ; You may already use these. Interactive documents mixing code, visualizations, and narrative. The foundation, but Quarto takes the concept further by producing publication-quality documents.
+
+### For Reproducible Environments
+
+- **Code Ocean** (codeocean.com) ; "Compute capsules" with guaranteed reproducibility. Used by IEEE for artifact review. You package your code, data, and environment; anyone can re-run it with one click.
+- **Whole Tale** (wholetale.org) ; NSF-funded. Captures "Tales"; executable research objects with data, code, environment, and narrative. Strong provenance tracking.
+- **Neurodesk** (neurodesk.org) ; Purpose-built for neuroimaging. Provides a full desktop environment with pre-built containers for FSL, FreeSurfer, ANTS, and other neuro tools.
+
+### For AI-Assisted Research
+
+- **Elicit** (elicit.com) ; Searches 138M+ papers using semantic search. Parses PDFs, extracts structured data, summarizes findings across studies. Think of it as an AI research assistant for literature review.
+- **Consensus** (consensus.app) ; Searches 200M+ peer-reviewed papers. Has a "Consensus Meter" showing whether the literature supports, opposes, or is neutral on a claim.
+- **Connected Papers** (connectedpapers.com) ; Visualizes citation networks as graphs. Start with one paper, see the entire landscape of related work.
+- **NotebookLM** (Google) ; Grounded exclusively in sources you provide. Upload your papers, data documentation, and methodology notes; ask questions grounded in that specific context.
+
+### For Statistical Error Detection
+
+- **Statcheck** ; Automatically extracts statistical results from papers, recalculates p-values, flags inconsistencies. 96-99% accuracy. Already used by psychology journals as part of peer review.
+- **GRIM Test** ; Checks whether reported means are mathematically possible given sample sizes. Simple but devastating; found impossible values in ~50% of papers tested.
+
+## What Your Research Repo Could Look Like
+
+```
+clinical-study/
+├── CLAUDE.md                  # AI assistant context; points to AGENTS.md
+├── AGENTS.md                  # Research integrity rules (see below)
+├── docker-compose.yml         # Full reproducible environment
+│
+├── .claude/                   # AI assistant configuration (see next section)
+│   ├── settings.json          # Tool permissions, model preferences
+│   ├── agents/
+│   │   └── team-members/      # Specialist agents you can summon
+│   │       ├── statistician.md
+│   │       ├── methodology-reviewer.md
+│   │       ├── literature-specialist.md
+│   │       ├── data-engineer.md
+│   │       └── domain-expert.md
+│   ├── commands/
+│   │   ├── validate-data.md       # /validate-data; run all data quality checks
+│   │   ├── pre-register.md        # /pre-register; Socratic hypothesis development
+│   │   ├── check-statistics.md    # /check-statistics; verify reported numbers
+│   │   └── prepare-submission.md  # /prepare-submission; pre-submission checklist
+│   └── skills/
+│       ├── add-data-source/
+│       │   └── SKILL.md       # Step-by-step: integrate a new dataset
+│       ├── write-analysis/
+│       │   └── SKILL.md       # Step-by-step: add a new analysis to the pipeline
+│       └── add-test-assertion/
+│           └── SKILL.md       # Step-by-step: formalize a finding as a test
+│
+├── data/
+│   ├── raw/                   # Immutable patient data (access-controlled)
+│   └── processed/             # Versioned transformations (DVC)
+│
+├── pre-registration/          # Hypotheses locked BEFORE data collection
+│   ├── primary-hypothesis.md  # Written via Socratic AI dialogue
+│   └── analysis-plan.md       # Statistical methods specified in advance
+│
+├── analysis/
+│   ├── AGENTS.md              # Analysis-specific rules (inherits from root)
+│   ├── notebooks/             # Jupyter / Quarto documents
+│   └── pipelines/             # Automated data processing workflows
+│
+├── tests/
+│   ├── data_quality/          # Pandera: "age 0-120", "no null patient IDs"
+│   ├── statistical/           # Hypothesis: property-based tests on analysis functions
+│   ├── regression/            # nbval: "notebook still produces same results"
+│   └── assertions/            # TDDA: auto-discovered data constraints
+│
+├── paper/
+│   ├── AGENTS.md              # Paper-specific rules: citation format, style guide
+│   └── manuscript.qmd         # Quarto doc; the paper IS the code
+│                              # Every number is computed, not typed
+│
+├── .github/workflows/
+│   └── continuous-analysis.yml # Re-run everything on every push
+│
+└── results/
+    └── figures/               # Git-tracked for regression comparison
+```
+
+Every push to Git triggers CI. The analysis re-runs. Tests validate the data. Assertions check statistical properties. The Quarto manuscript recompiles with live-computed values. If anything changes or breaks, you know immediately; not six months later when a reviewer catches it, or six years later when someone tries to replicate your work.
+
+## The `.claude/` Ecosystem: Your AI Research Team
+
+Claude Code (Anthropic's AI coding assistant, which runs in VS Code or as a CLI) has a configuration system that turns a single AI assistant into a structured team with specialists, repeatable workflows, and institutional knowledge. This is where software engineering practices become genuinely powerful for research.
+
+### Three Concepts: Agents, Commands, and Skills
+
+**Agents** are specialist personas the AI can become. Each is a markdown file that defines expertise, constraints, and what tools the agent can use. When you invoke an agent, the AI reads that file and operates within those boundaries.
+
+**Commands** are reusable workflows you trigger with a slash command (like `/validate-data`). They're markdown files that define a multi-step process the AI should follow. Think of them as SOPs (standard operating procedures) that the AI executes consistently every time.
+
+**Skills** are step-by-step checklists for complex, repeatable tasks. Unlike commands (which are invoked explicitly), skills are loaded automatically when the AI recognizes a matching task. They encode institutional knowledge; "here's exactly how we add a new data source to our pipeline."
+
+### Agents: Your Research Team
+
+In a software project, you might have agents like `security-auditor`, `performance-engineer`, or `frontend-architect`. For research, the same pattern creates a virtual research team:
+
+```markdown
+# .claude/agents/team-members/statistician.md
+
+---
+name: statistician
+description: Reviews statistical methodology, power analysis, and test selection
+model: claude-sonnet-4-6
+tools: Read, Grep, Glob
+---
+
+## Role
+Senior biostatistician specializing in clinical neuroscience research.
+
+## Domain Expertise
+- **Power analysis**: Sample size calculations, effect size estimation, minimum detectable effects
+- **Test selection**: Parametric vs non-parametric, correction for multiple comparisons
+- **Assumption checking**: Normality, homoscedasticity, independence, linearity
+- **Effect reporting**: Cohen's d, eta-squared, confidence intervals, Bayesian alternatives
+
+## Review Focus
+- Flag underpowered analyses (power < 0.80)
+- Verify appropriate test selection for data type and distribution
+- Check for multiple comparison corrections (Bonferroni, FDR, Holm)
+- Ensure effect sizes are reported alongside p-values
+- Flag p-values near thresholds without contextual interpretation
+
+## Boundaries
+- Never suggest removing data points without pre-registered justification
+- Never recommend switching statistical tests after seeing results
+- Always flag if sample size changed from pre-registration
+```
+
+```markdown
+# .claude/agents/team-members/methodology-reviewer.md
+
+---
+name: methodology-reviewer
+description: Reviews experimental design, controls, confounds, and clinical protocol adherence
+model: claude-sonnet-4-6
+tools: Read, Grep, Glob
+---
+
+## Role
+Experienced peer reviewer simulating a hostile but fair journal referee.
+
+## Domain Expertise
+- **Experimental design**: Between/within subjects, crossover, randomization
+- **Clinical protocols**: IRB compliance, informed consent, blinding
+- **Confound identification**: Selection bias, attrition, practice effects
+- **Reporting standards**: CONSORT, STROBE, PRISMA checklist adherence
+
+## Review Focus
+- Identify uncontrolled confounding variables
+- Verify randomization and blinding procedures
+- Check for selective reporting or outcome switching
+- Ensure methodology matches pre-registration
+- Flag deviations from clinical protocol
+```
+
+You could also have a `literature-specialist` (finds relevant citations, checks if claims are supported by the literature), a `data-engineer` (reviews pipeline code for correctness and efficiency), and a `domain-expert` (deep knowledge of your specific disorder and treatment landscape).
+
+**The power move**: You can run a "team review" command that spins up all these agents in parallel against your current work; statistician, methodology reviewer, literature specialist, domain expert; and synthesizes their findings into a single report. This is like getting peer review *before* you submit, on demand, in minutes instead of months.
+
+### Commands: Repeatable Research Workflows
+
+Commands encode your standard procedures as executable instructions:
+
+```markdown
+# .claude/commands/pre-register.md
+
+---
+description: Socratic dialogue to develop and formalize a pre-registration document
+allowed-tools: Read, Write, Grep, Glob
+---
+
+Guide the researcher through pre-registration using the Socratic method.
+
+## Phase 1: Hypothesis Development
+Ask probing questions to crystallize the hypothesis:
+- What specific effect are you predicting?
+- What is the null hypothesis? What would falsify your prediction?
+- What is the smallest effect size you consider clinically meaningful?
+- What prior evidence supports this hypothesis? (Check pre-registration/ for context)
+
+## Phase 2: Methodology Lock-in
+- What statistical test will you use? Why this test over alternatives?
+- What is your target sample size? Show the power analysis.
+- What are your inclusion/exclusion criteria?
+- What covariates will you control for?
+- How will you handle missing data?
+
+## Phase 3: Analysis Plan
+- Define primary and secondary outcomes
+- Specify the exact analysis pipeline (which scripts, in what order)
+- Define what constitutes a "significant" result
+- Pre-specify any planned subgroup analyses
+
+## Phase 4: Output
+Write the finalized pre-registration to pre-registration/ as a dated markdown file.
+Include the full dialogue as an appendix; this is the provenance trail.
+```
+
+Now typing `/pre-register` in Claude Code starts a structured Socratic interview that produces a formal pre-registration document. Every time. Same rigor. Same questions. With a full transcript of the reasoning.
+
+Other research commands might include:
+
+- `/validate-data` ; Run all Pandera schemas, TDDA constraints, and data quality checks. Report any violations.
+- `/check-statistics` ; Extract all reported statistics from the Quarto manuscript, recompute them from the data, flag any discrepancies (your own private Statcheck).
+- `/prepare-submission` ; Pre-submission checklist: run all tests, verify reproducibility, check CONSORT/STROBE compliance, run the team review, generate a submission-readiness report.
+- `/literature-check` ; Given a claim in the manuscript, search for supporting and contradicting evidence in the literature.
+
+### Skills: Institutional Knowledge That Persists
+
+Skills capture "how we do things here" as step-by-step checklists. They're automatically loaded when the AI recognizes a matching task:
+
+```markdown
+# .claude/skills/add-data-source/SKILL.md
+
+## When to Use
+When integrating a new clinical dataset into the analysis pipeline.
+
+## Steps
+1. Add raw data to data/raw/ (never modify raw data after initial deposit)
+2. Create a Pandera schema in tests/data_quality/ defining all expected columns,
+   types, and value ranges
+3. Write a preprocessing script in analysis/pipelines/
+4. Add DVC tracking for the processed output
+5. Create regression test: run pipeline, snapshot output, add nbval test
+6. Update the Quarto manuscript's data description section
+7. Run /validate-data to verify the new source passes all checks
+8. Update AGENTS.md if the new data introduces domain-specific constraints
+```
+
+This means a new team member (or AI assistant) can integrate a dataset correctly on the first try, following the same procedure every time, without needing to ask "how do we usually do this?"
+
+### AGENTS.md Hierarchy: Rules That Follow You
+
+AGENTS.md files can be placed at any level of the project directory tree. The AI loads them hierarchically; root rules always apply, and folder-specific rules add constraints when working in that area:
+
+```
+clinical-study/
+├── AGENTS.md                  # Universal rules (always report effect sizes, etc.)
+├── analysis/
+│   └── AGENTS.md              # "Always pin random seeds", "Log all parameter choices"
+├── paper/
+│   └── AGENTS.md              # "Use APA 7th edition", "Every claim needs a citation"
+└── data/
+    └── AGENTS.md              # "Never modify raw/", "All PII must be de-identified"
+```
+
+When the AI is helping you write the manuscript, it inherits both the root rules (report effect sizes) AND the paper-specific rules (APA format, citation requirements). When it's working on the analysis pipeline, it gets the root rules AND the analysis rules (pin random seeds). The constraints are structural and automatic; you don't have to remember to tell the AI every time.
+
+## The AI Layer: Where This Gets Interesting
+
+Everything above is about reproducibility and verification; making research more like software. But AI adds a dimension that software engineering doesn't have:
+
+### Socratic Pre-Registration
+
+Before you design an experiment, an AI assistant (Claude, via VS Code or Claude Code) can interview you using the Socratic method:
+
+- "What's your null hypothesis? What would falsify it?"
+- "You're assuming a normal distribution; what does your pilot data's actual distribution look like?"
+- "Your sample size is 40. Given the expected effect size, what's your statistical power? Is it sufficient?"
+- "What confounds haven't you controlled for? What would a hostile reviewer say?"
+
+The conversation crystallizes into a formal pre-registration document. The AI doesn't write your hypothesis; it pressure-tests it, the same way a good thesis advisor would, but available at 2 AM when the insight strikes.
+
+### AI-Assisted Review Before Peer Review
+
+Stanford's Agentic Reviewer (paperreview.ai) matches human reviewer consistency. Before submitting to a journal, you could get structured AI feedback on methodology, statistical rigor, and logical coherence. At ICLR 2025, an AI review system processed 10,000+ submissions; 27% of reviewers who received AI feedback updated their reviews.
+
+### AGENTS.md as Research Methodology Guard Rails
+
+In software, AGENTS.md files tell AI assistants "always do X, never do Y"; project-level rules that constrain AI behavior. For research, these become methodology guardrails:
+
+```markdown
+# AGENTS.md; Clinical Neuroscience Research
+
+## Always Do
+- Report effect sizes alongside p-values
+- Use Bonferroni correction for multiple comparisons
+- Verify sample size adequacy before analysis
+- Check normality assumptions before parametric tests
+- Include confidence intervals in all results
+
+## Never Do
+- Report uncorrected p-values for multiple comparisons
+- Use parametric tests on non-normal distributions without justification
+- Remove outliers without pre-registered criteria
+- Report only significant results (file drawer problem)
+- Round p-values favorably (p = 0.052 is not "trending toward significance")
+```
+
+When an AI assistant helps with analysis, these rules constrain it automatically. The AI won't let you accidentally p-hack; the guardrails are structural, not willpower-based.
+
+### Tests as Thinking Tools
+
+This might be the most important insight. In a well-tested software codebase, tests don't just verify correctness; they **constrain the space of acceptable changes**. An AI agent working in a tested codebase can experiment freely because the tests will catch mistakes instantly.
+
+The same principle applies to research. As you work through an analysis, you can formalize what you've established as tests:
+
+- "We've established that Treatment A produces a statistically significant difference in Group 1. Write that as a test."
+- Now that test exists. If a later change to your pipeline breaks that established finding, you know immediately.
+- "We've confirmed that age is not a confounding variable. Write an assertion that the age distributions across groups are not significantly different."
+- Now that's locked in. If new data arrives where age *is* confounding, the test catches it.
+
+You're building a **scaffold of verified facts** as you go. Each test is a piece of ground you've proven solid. New analysis stands on that ground. If the ground shifts, the tests tell you.
+
+This is what doesn't exist in research today. Findings are written in prose, in papers, and checked by humans reading carefully. They should be written as executable assertions, checked by machines continuously.
+
+## Next Steps
+
+1. **Working session**: Set up one of your actual research projects in this structure. See what breaks. See what the workflow feels like. This is worth more than any document.
+
+2. **Start small**: You don't need all of this at once. The highest-impact starting points:
+   - Quarto for executable manuscripts (your paper computes its own results)
+   - Pandera for data validation (catch data quality issues automatically)
+   - GitHub Actions for continuous analysis (know immediately when results change)
+
+3. **Explore the AI tools**: Try Elicit for literature review. Try Claude Code with an AGENTS.md tailored to your research methodology. Try the Socratic pre-registration workflow.
+
+4. **Read the key papers**:
+   - Beaulieu-Jones & Greene, "Continuous Analysis" (Nature Biotechnology, 2017)
+   - Nosek et al., "The preregistration revolution" (PNAS, 2018)
+   - Hatfield-Dodds, "Falsify your Software" (SciPy 2020); property-based testing for scientific code
+   - Baker, "1,500 scientists lift the lid on reproducibility" (Nature, 2016)
+
+## The Vision
+
+The end state is a research project where:
+
+- The paper is software. It executes. It computes its own results. If the prose says something the data doesn't support, the build fails.
+- Every established finding is a test. The scaffold of verified facts grows as the research progresses.
+- Every push triggers re-analysis. You find out about problems in minutes, not months.
+- AI assistants work within methodological guardrails. They can help with analysis, writing, and review; but they can't violate your pre-registered methodology or your statistical rules.
+- Reproducibility is guaranteed by construction. Anyone can clone the repo, run `docker-compose up`, and get identical results. Not because they trust you; because the machine verified it.
+
+Research papers have been PDFs for decades. They could be programs. The tools exist. The integration doesn't; yet.
+
+*Prepared March 2026. Based on research from Nature, Nature Biotechnology, PNAS, Science, Stanford AI Lab, SciPy proceedings, and the Center for Open Science. All tools mentioned are open source or freely available.*
