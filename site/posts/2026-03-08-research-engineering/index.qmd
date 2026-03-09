@@ -61,7 +61,22 @@ Research has no equivalent. There is no automated layer between "I wrote this an
 
 This is the radical reframing: **a research paper is a program that transforms data into conclusions.** If you treat it that way, every software engineering practice becomes applicable.
 
-Here's what that looks like concretely:
+Here's the full mapping:
+
+| Software Engineering Concept | Research Equivalent | Tools That Exist Today | Adoption |
+|---|---|---|---|
+| **TDD** (write tests before code) | **Pre-registration** (specify hypotheses before data collection) | Center for Open Science, OSF | Moderate |
+| **Unit tests for data** | **Data assertions / schema validation** | Pandera, TDDA, Great Expectations | Mature tools, low research adoption |
+| **Property-based testing** | **Statistical invariant checking** | Hypothesis (Python); used by NumPy, Astropy | Proven in scientific libraries |
+| **Regression tests** | **Notebook output verification** | nbval (pytest plugin), nbcelltests (JP Morgan) | Exists, niche adoption |
+| **Integration tests for pipelines** | **Pipeline validation** | nf-test (Nextflow), Snakemake testing framework | Strong in bioinformatics |
+| **CI/CD** | **Continuous Analysis** | Docker + GitHub Actions (Beaulieu-Jones & Greene, Nature Biotech 2017) | Published, low adoption |
+| **Linting / static analysis** | **Statistical error detection** | Statcheck (96-99% accuracy), GRIM test | Used by some journals |
+| **PR review** | **Peer review** | Stanford Agentic Reviewer (0.42 correlation with humans) | Deployed at ICLR 2025 |
+| **Code compiles** (intrinsic verification) | **Analysis reproduces from scratch** | Docker, Code Ocean, Whole Tale, Neurodesk | Partial solution |
+| **AGENTS.md** (AI methodology guardrails) | **Nothing yet** | Open opportunity | Doesn't exist |
+
+Here's what each of those looks like concretely:
 
 ### Pre-registration = Test-Driven Development
 
